@@ -70,7 +70,7 @@ const HomeScreen = () => {
     {errorMsg ? (
       <Text>{errorMsg}</Text>
     ) : (
-        console.log(location)
+       console.log(location)
     )}
       <MapView
         style={styles.map}

@@ -28,7 +28,7 @@ jobs:
 
     - name: Analyze code changes
       run: |
-        python .github/scripts/analyze_code_changes.py
+        python .github/analyze_code_changes.py
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

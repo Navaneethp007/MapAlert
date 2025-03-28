@@ -28,9 +28,15 @@ jobs:
 
     - name: Analyze code changes
       run: |
+        mkdir -p .docai
         python .github/scripts/analyze_code_changes.py
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Debug .docai contents
+      run: |
+        ls -la .docai/ || echo ".docai/ is empty or missing"
+        cat .docai/* || echo "No files to display"
 
     - name: Store analysis results
       uses: actions/upload-artifact@v4

@@ -1,6 +1,14 @@
 {
-  "elements": {},
+  "elements": {
+    "0c60a5db025bad5b95414ea677bc4671": {
+      "type": "function",
+      "name": "hello",
+      "file_path": "test.py",
+      "code": "def hello():\n print(\"hello\")",
+      "added_at": "2e91971d91f8bf56c4dbd427e6f0c642aa15262e"
+    }
+  },
   "metadata": {
-    "last_processed_commit": "759fac4cfc033f400b4a934fd6ac5c0bbfdcbb28"
+    "last_processed_commit": "2e91971d91f8bf56c4dbd427e6f0c642aa15262e"
   }
 }

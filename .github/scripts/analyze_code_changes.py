@@ -1263,78 +1263,75 @@ class CodeAnalyzer:
                 )
         except Exception as e:
             logger.error(f"Error extracting class references: {e}")
-
+    #changed
     def _parse_file(self, file_path: str) -> List[Dict]:
-        """Parse a file to extract code elements."""
-        lang_name = self._get_file_language(file_path)
-        if not lang_name or lang_name not in self.languages:
-            return []
+     lang_name = self._get_file_language(file_path)
+     if not lang_name or lang_name not in self.languages:
+        logger.info(f"Cannot parse {file_path}: Language {lang_name} not supported")
+        return []
 
-        # Read the file
-        try:
-            with open(file_path, "rb") as f:
-                content = f.read()
-        except Exception as e:
-            logger.error(f"Error reading file {file_path}: {e}")
-            return []
+    # Read the file
+     try:
+        with open(file_path, "rb") as f:
+            content = f.read()
+        logger.debug(f"Read {len(content)} bytes from {file_path}")
+     except Exception as e:
+        logger.error(f"Error reading file {file_path}: {e}")
+        return []
 
-        # Parse the file
-        self.parser.language = self.languages[lang_name]
+    # Parse the file
+     self.parser.language = self.languages[lang_name]
+     try:
         tree = self.parser.parse(content)
+        logger.debug(f"Parsed AST for {file_path}")
+     except Exception as e:
+        logger.error(f"Error parsing {file_path}: {e}")
+        return []
 
-        logger.info(f"Parsing file: {file_path}")
+     logger.info(f"Parsing file: {file_path}")
+     self.current_file = file_path
 
-        # Store current file path for use in dependency resolution
-        self.current_file = file_path
+     code_elements = []
+     elements_by_name = {}
+     elements_by_id = {}
 
-        # Initialize collections
-        code_elements = []
-        elements_by_name = {}
-        elements_by_id = {}
+     for node in self._iter_tree(tree.root_node):
+        element_info = self._get_element_info(node, content, lang_name)
+        if element_info and element_info.get("name"):
+            try:
+                element_code = content[node.start_byte : node.end_byte].decode(
+                    "utf-8", errors="replace"
+                )
+                rel_file_path = os.path.relpath(file_path, self.repo_path)
 
-        # First pass: identify all code elements
-        for node in self._iter_tree(tree.root_node):
-            element_info = self._get_element_info(node, content, lang_name)
-            if element_info and element_info.get("name"):
-                try:
-                    # Get the full code for this element
-                    element_code = content[node.start_byte : node.end_byte].decode(
-                        "utf-8", errors="replace"
-                    )
-                    rel_file_path = os.path.relpath(file_path, self.repo_path)
+                element = {
+                    "type": element_info["type"],
+                    "name": element_info["name"],
+                    "code": element_code,
+                    "start_line": node.start_point[0] + 1,
+                    "start_col": node.start_point[1],
+                    "end_line": node.end_point[0] + 1,
+                    "end_col": node.end_point[1],
+                    "file_path": rel_file_path,
+                    "node": node,
+                }
 
-                    # Create the element with the exact structure requested
-                    element = {
-                        "type": element_info["type"],
-                        "name": element_info["name"],
-                        "code": element_code,
-                        "start_line": node.start_point[0] + 1,
-                        "start_col": node.start_point[1],
-                        "end_line": node.end_point[0] + 1,
-                        "end_col": node.end_point[1],
-                        "file_path": rel_file_path,
-                        "node": node,  # Store the node for later dependency analysis
-                    }
+                element["code"] = self._format_code(element["code"])
+                element_id = self._generate_element_id(element)
+                element["id"] = element_id
 
-                    # Format the code
-                    element["code"] = self._format_code(element["code"])
+                elements_by_name[element_info["name"]] = element
+                elements_by_id[element_id] = element
+                code_elements.append(element)
+                logger.debug(f"Found element {element_info['name']} in {file_path}")
 
-                    # Generate unique ID
-                    element_id = self._generate_element_id(element)
-                    element["id"] = element_id
+            except Exception as e:
+                logger.error(f"Error processing element {element_info['name']} in {file_path}: {e}")
+                continue
 
-                    # Store element in lookup dictionaries
-                    elements_by_name[element_info["name"]] = element
-                    elements_by_id[element_id] = element
+    # Rest of the method remains unchanged...
 
-                    # Add to code elements list (without dependencies for now)
-                    code_elements.append(element)
-
-                except Exception as e:
-                    logger.error(
-                        f"Error processing element {element_info['name']}: {e}"
-                    )
-                    continue
+    # Rest of the method remains unchanged...
 
         # Second pass: find dependencies and back-references
         all_dependencies = {}
@@ -1718,63 +1715,130 @@ class CodeAnalyzer:
                 return False
             current = current.parent
         return True
+    
+    #changed
+    def analyze_repository(self) -> Dict[str, Any]:  
+     logger.info(f"Starting repository analysis at {self.repo_path}")
 
-    def analyze_repository(self) -> Dict[str, Any]:
-        """Analyze all files in the repository."""
-        logger.info(f"Starting repository analysis at {self.repo_path}")
+     all_code_elements = []
+     processed_files = []
 
-        all_code_elements = []
-        processed_files = []
+     for root, dirs, files in os.walk(self.repo_path):
+        dirs[:] = [
+            d for d in dirs if not self._should_exclude_path(os.path.join(root, d))
+        ]
 
-        # Walk through the repository
-        for root, dirs, files in os.walk(self.repo_path):
-            # Skip excluded directories
-            dirs[:] = [
-                d for d in dirs if not self._should_exclude_path(os.path.join(root, d))
-            ]
+        for file in files:
+            file_path = os.path.join(root, file)
+            rel_path = os.path.relpath(file_path, self.repo_path)
+            
+            # Log every file encountered
+            logger.info(f"Evaluating file: {rel_path}")
 
-            for file in files:
-                file_path = os.path.join(root, file)
+            # Check exclusion
+            if self._should_exclude_path(file_path):
+                logger.info(f"Skipping {rel_path}: Matches exclusion pattern")
+                continue
 
-                # Skip excluded files
-                if self._should_exclude_path(file_path):
-                    continue
+            # Check language support
+            lang_name = self._get_file_language(file_path)
+            if not lang_name:
+                logger.info(f"Skipping {rel_path}: Unknown file extension")
+                continue
+            if lang_name not in self.languages:
+                logger.info(f"Skipping {rel_path}: Language {lang_name} not supported")
+                continue
 
-                # Check if file type is supported
-                lang_name = self._get_file_language(file_path)
-                if not lang_name or lang_name not in self.languages:
-                    continue
-
-                # Process the file
-                try:
-                    elements = self._parse_file(file_path)
+            # Process the file
+            try:
+                logger.info(f"Processing {rel_path} (language: {lang_name})")
+                elements = self._parse_file(file_path)
+                if elements:
                     all_code_elements.extend(elements)
-                    processed_files.append(os.path.relpath(file_path, self.repo_path))
-                except Exception as e:
-                    logger.error(f"Error processing file {file_path}: {e}")
+                    processed_files.append(rel_path)
+                    logger.info(f"Successfully processed {rel_path}: {len(elements)} elements")
+                else:
+                    logger.info(f"No elements found in {rel_path}")
+            except Exception as e:
+                logger.error(f"Error processing {rel_path}: {e}")
 
-        # Create result database
-        result = {
-            "elements": all_code_elements,
-            "metadata": {
-                "last_analysis": datetime.datetime.now().isoformat(),
-                "total_elements": len(all_code_elements),
-                "processed_files": processed_files,
-            },
-        }
+     result = {
+        "elements": all_code_elements,
+        "metadata": {
+            "last_analysis": datetime.datetime.now().isoformat(),
+            "total_elements": len(all_code_elements),
+            "processed_files": processed_files,
+        },
+     }
 
-        # Save to JSON file
-        try:
-            with open(ELEMENTS_DB_PATH, "w", encoding="utf-8") as f:
-                json.dump(result, f, indent=2)
-            logger.info(f"Analysis results saved to {ELEMENTS_DB_PATH}")
-        except Exception as e:
-            logger.error(f"Error saving results: {e}")
+     try:
+        with open(ELEMENTS_DB_PATH, "w", encoding="utf-8") as f:
+            json.dump(result, f, indent=2)
+        logger.info(f"Analysis results saved to {ELEMENTS_DB_PATH}")
+     except Exception as e:
+        logger.error(f"Error saving results: {e}")
 
-        logger.info(
-            f"Analysis complete. Found {len(all_code_elements)} code elements in {len(processed_files)} files"
-        )
-        return result
+     logger.info(
+        f"Analysis complete. Found {len(all_code_elements)} code elements in {len(processed_files)} files"
+     )
+     return result
+
+    # def analyze_repository(self) -> Dict[str, Any]:
+    #     """Analyze all files in the repository."""
+    #     logger.info(f"Starting repository analysis at {self.repo_path}")
+
+    #     all_code_elements = []
+    #     processed_files = []
+
+    #     # Walk through the repository
+    #     for root, dirs, files in os.walk(self.repo_path):
+    #         # Skip excluded directories
+    #         dirs[:] = [
+    #             d for d in dirs if not self._should_exclude_path(os.path.join(root, d))
+    #         ]
+
+    #         for file in files:
+    #             file_path = os.path.join(root, file)
+
+    #             # Skip excluded files
+    #             if self._should_exclude_path(file_path):
+    #                 continue
+
+    #             # Check if file type is supported
+    #             lang_name = self._get_file_language(file_path)
+    #             if not lang_name or lang_name not in self.languages:
+    #                 continue
+
+    #             # Process the file
+    #             try:
+    #                 elements = self._parse_file(file_path)
+    #                 all_code_elements.extend(elements)
+    #                 processed_files.append(os.path.relpath(file_path, self.repo_path))
+    #             except Exception as e:
+    #                 logger.error(f"Error processing file {file_path}: {e}")
+
+    #     # Create result database
+    #     result = {
+    #         "elements": all_code_elements,
+    #         "metadata": {
+    #             "last_analysis": datetime.datetime.now().isoformat(),
+    #             "total_elements": len(all_code_elements),
+    #             "processed_files": processed_files,
+    #         },
+    #     }
+
+    #     # Save to JSON file
+    #     try:
+    #         with open(ELEMENTS_DB_PATH, "w", encoding="utf-8") as f:
+    #             json.dump(result, f, indent=2)
+    #         logger.info(f"Analysis results saved to {ELEMENTS_DB_PATH}")
+    #     except Exception as e:
+    #         logger.error(f"Error saving results: {e}")
+
+    #     logger.info(
+    #         f"Analysis complete. Found {len(all_code_elements)} code elements in {len(processed_files)} files"
+    #     )
+    #     return result
 
 
 def main():

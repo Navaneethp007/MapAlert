@@ -371,12 +371,7 @@ class CodeAnalyzer:
                 elif node.type == "export_statement":
                     declaration = node.child_by_field_name("declaration")
                     if declaration and declaration.type == "function_declaration":
-                        name_node = declaration.child_by_field_name("name")
-                        if name_node:
-                            return {
-                                "type": "function",
-                                "name": name_node.text.decode("utf-8"),
-                            }
+                        return None
 
                 # Handle import statements at module level
                 elif node.type == "import_declaration" and self._is_module_level(node):
@@ -1265,140 +1260,116 @@ class CodeAnalyzer:
             logger.error(f"Error extracting class references: {e}")
 
     def _parse_file(self, file_path: str) -> List[Dict]:
-        """Parse a file to extract code elements."""
-        lang_name = self._get_file_language(file_path)
-        if not lang_name or lang_name not in self.languages:
-            return []
+     lang_name = self._get_file_language(file_path)
+     if not lang_name or lang_name not in self.languages:
+        logger.info(f"Cannot parse {file_path}: Language {lang_name} not supported")
+        return []
 
-        # Read the file
-        try:
-            with open(file_path, "rb") as f:
-                content = f.read()
-        except Exception as e:
-            logger.error(f"Error reading file {file_path}: {e}")
-            return []
+     try:
+        with open(file_path, "rb") as f:
+            content = f.read()
+     except Exception as e:
+        logger.error(f"Error reading file {file_path}: {e}")
+        return []
 
-        # Parse the file
-        self.parser.language = self.languages[lang_name]
+     self.parser.language = self.languages[lang_name]
+     try:
         tree = self.parser.parse(content)
+     except Exception as e:
+        logger.error(f"Error parsing {file_path}: {e}")
+        return []
 
-        logger.info(f"Parsing file: {file_path}")
+     logger.info(f"Parsing file: {file_path}")
+     self.current_file = file_path
 
-        # Store current file path for use in dependency resolution
-        self.current_file = file_path
+     code_elements = []
+     elements_by_name = {}
+     elements_by_id = {}
 
-        # Initialize collections
-        code_elements = []
-        elements_by_name = {}
-        elements_by_id = {}
-
-        # First pass: identify all code elements
-        for node in self._iter_tree(tree.root_node):
-            element_info = self._get_element_info(node, content, lang_name)
-            if element_info and element_info.get("name"):
-                try:
-                    # Get the full code for this element
-                    element_code = content[node.start_byte : node.end_byte].decode(
-                        "utf-8", errors="replace"
-                    )
-                    rel_file_path = os.path.relpath(file_path, self.repo_path)
-
-                    # Create the element with the exact structure requested
-                    element = {
-                        "type": element_info["type"],
-                        "name": element_info["name"],
-                        "code": element_code,
-                        "start_line": node.start_point[0] + 1,
-                        "start_col": node.start_point[1],
-                        "end_line": node.end_point[0] + 1,
-                        "end_col": node.end_point[1],
-                        "file_path": rel_file_path,
-                        "node": node,  # Store the node for later dependency analysis
-                    }
-
-                    # Format the code
-                    element["code"] = self._format_code(element["code"])
-
-                    # Generate unique ID
-                    element_id = self._generate_element_id(element)
-                    element["id"] = element_id
-
-                    # Store element in lookup dictionaries
-                    elements_by_name[element_info["name"]] = element
-                    elements_by_id[element_id] = element
-
-                    # Add to code elements list (without dependencies for now)
-                    code_elements.append(element)
-
-                except Exception as e:
-                    logger.error(
-                        f"Error processing element {element_info['name']}: {e}"
-                    )
-                    continue
-
-        # Second pass: find dependencies and back-references
-        all_dependencies = {}
-        for element in code_elements:
+     for node in self._iter_tree(tree.root_node):
+        element_info = self._get_element_info(node, content, lang_name)
+        if element_info and element_info.get("name"):
             try:
-                # Find dependencies for this element
-                dependencies = self._find_dependencies(
-                    element["node"], content, elements_by_name, lang_name, element["id"]
+                element_code = content[node.start_byte : node.end_byte].decode(
+                    "utf-8", errors="replace"
                 )
-                element["dependencies"] = dependencies
+                rel_file_path = os.path.relpath(file_path, self.repo_path)
 
-                # Store in lookup for back-reference tracking
-                all_dependencies[element["id"]] = dependencies
-            except Exception as e:
-                logger.error(f"Error finding dependencies for {element['name']}: {e}")
-                element["dependencies"] = {
-                    "tree": {
-                        "functions": {},
-                        "classes": {},
-                        "variables": {},
-                        "calls": [],
-                        "inheritance": [],
-                        "references": [],
-                    }
+                element = {
+                    "type": element_info["type"],
+                    "name": element_info["name"],
+                    "code": element_code,
+                    "start_line": node.start_point[0] + 1,
+                    "start_col": node.start_point[1],
+                    "end_line": node.end_point[0] + 1,
+                    "end_col": node.end_point[1],
+                    "file_path": rel_file_path,
+                    "node": node,
                 }
 
-        # Create a dictionary to track which elements were directly referenced
-        direct_reference_tracking = {element["id"]: set() for element in code_elements}
+                element["code"] = self._format_code(element["code"])
+                element_id = self._generate_element_id(element)
+                element["id"] = element_id
 
-        # Third pass: add back-references to each element and track direct references
-        for element in code_elements:
-            # Initialize back-references section
-            element["referenced_by"] = {
-                "functions": {},
-                "classes": {},
-                "variables": {},
-                "inheritance": [],
-                "references": [],
+                elements_by_name[element_info["name"]] = element
+                elements_by_id[element_id] = element
+                code_elements.append(element)
+
+            except Exception as e:
+                logger.error(f"Error processing element {element_info['name']} in {file_path}: {e}")
+                continue
+
+    # Second pass: find dependencies
+     all_dependencies = {}
+     for element in code_elements:
+        try:
+            dependencies = self._find_dependencies(
+                element["node"], content, elements_by_name, lang_name, element["id"]
+            )
+            element["dependencies"] = dependencies
+            all_dependencies[element["id"]] = dependencies
+        except Exception as e:
+            logger.error(f"Error finding dependencies for {element['name']}: {e}")
+            element["dependencies"] = {
+                "tree": {
+                    "functions": {},
+                    "classes": {},
+                    "variables": {},
+                    "calls": [],
+                    "inheritance": [],
+                    "references": [],
+                }
             }
 
-            # Find elements that reference this one
-            for other_id, deps in all_dependencies.items():
-                # Skip self-references
-                if other_id == element["id"]:
-                    continue
+    # Third pass: add back-references
+     direct_reference_tracking = {element["id"]: set() for element in code_elements}
+     for element in code_elements:
+        element["referenced_by"] = {
+            "functions": {},
+            "classes": {},
+            "variables": {},
+            "inheritance": [],
+            "references": [],
+        }
 
-                # Check functions that reference this element
-                for func_name, func_info in deps["tree"]["functions"].items():
-                    if func_info.get("id") == element["id"]:
-                        # Found a function that references this element
+        for other_id, deps in all_dependencies.items():
+            if other_id == element["id"]:
+                continue
+
+            # Check dependencies (simplified for brevity)
+            for category in ["functions", "classes", "variables"]:
+                for item_name, item_info in deps["tree"][category].items():
+                    if item_info.get("id") == element["id"]:
                         other_element = elements_by_id.get(other_id)
                         if other_element and other_element["id"] != element["id"]:
-                            # Track this as a direct reference
                             direct_reference_tracking[element["id"]].add(other_id)
-
-                            element["referenced_by"]["functions"][
-                                other_element["name"]
-                            ] = {
+                            element["referenced_by"][category][other_element["name"]] = {
                                 "id": other_id,
                                 "name": other_element["name"],
                                 "type": other_element["type"],
                                 "file": other_element["file_path"],
                                 "line": other_element["start_line"],
-                                "context": "referenced_by_function",
+                                "context": f"referenced_by_{category[:-1]}",
                                 "code": other_element["code"],
                                 "source_location": {
                                     "file": other_element["file_path"],
@@ -1409,141 +1380,63 @@ class CodeAnalyzer:
                                 },
                             }
 
-                # Check classes that reference this element
-                for class_name, class_info in deps["tree"]["classes"].items():
-                    if class_info.get("id") == element["id"]:
-                        # Found a class that references this element
-                        other_element = elements_by_id.get(other_id)
-                        if other_element and other_element["id"] != element["id"]:
-                            # Track this as a direct reference
-                            direct_reference_tracking[element["id"]].add(other_id)
-
-                            element["referenced_by"]["classes"][
-                                other_element["name"]
-                            ] = {
-                                "id": other_id,
-                                "name": other_element["name"],
-                                "type": other_element["type"],
+            for inherit_info in deps["tree"]["inheritance"]:
+                if inherit_info.get("id") == element["id"]:
+                    other_element = elements_by_id.get(other_id)
+                    if other_element and other_element["id"] != element["id"]:
+                        direct_reference_tracking[element["id"]].add(other_id)
+                        element["referenced_by"]["inheritance"].append({
+                            "id": other_id,
+                            "name": other_element["name"],
+                            "type": other_element["type"],
+                            "file": other_element["file_path"],
+                            "line": other_element["start_line"],
+                            "context": "inherited_by",
+                            "code": other_element["code"],
+                            "source_location": {
                                 "file": other_element["file_path"],
-                                "line": other_element["start_line"],
-                                "context": "referenced_by_class",
-                                "code": other_element["code"],
-                                "source_location": {
-                                    "file": other_element["file_path"],
-                                    "start_line": other_element["start_line"],
-                                    "start_col": other_element["start_col"],
-                                    "end_line": other_element["end_line"],
-                                    "end_col": other_element["end_col"],
-                                },
-                            }
+                                "start_line": other_element["start_line"],
+                                "start_col": other_element["start_col"],
+                                "end_line": other_element["end_line"],
+                                "end_col": other_element["end_col"],
+                            },
+                        })
 
-                # Check variables that reference this element
-                for var_name, var_info in deps["tree"]["variables"].items():
-                    if var_info.get("id") == element["id"]:
-                        # Found a variable that references this element
-                        other_element = elements_by_id.get(other_id)
-                        if other_element and other_element["id"] != element["id"]:
-                            # Track this as a direct reference
-                            direct_reference_tracking[element["id"]].add(other_id)
-
-                            element["referenced_by"]["variables"][
-                                other_element["name"]
-                            ] = {
-                                "id": other_id,
-                                "name": other_element["name"],
-                                "type": other_element["type"],
+            for ref_info in deps["tree"]["references"]:
+                if ref_info.get("id") == element["id"]:
+                    other_element = elements_by_id.get(other_id)
+                    if other_element and other_element["id"] != element["id"]:
+                        direct_reference_tracking[element["id"]].add(other_id)
+                        element["referenced_by"]["references"].append({
+                            "id": other_id,
+                            "name": other_element["name"],
+                            "type": other_element["type"],
+                            "file": other_element["file_path"],
+                            "line": other_element["start_line"],
+                            "context": "referenced_by",
+                            "code": other_element["code"],
+                            "source_location": {
                                 "file": other_element["file_path"],
-                                "line": other_element["start_line"],
-                                "context": "referenced_by_variable",
-                                "code": other_element["code"],
-                                "source_location": {
-                                    "file": other_element["file_path"],
-                                    "start_line": other_element["start_line"],
-                                    "start_col": other_element["start_col"],
-                                    "end_line": other_element["end_line"],
-                                    "end_col": other_element["end_col"],
-                                },
-                            }
+                                "start_line": other_element["start_line"],
+                                "start_col": other_element["start_col"],
+                                "end_line": other_element["end_line"],
+                                "end_col": other_element["end_col"],
+                            },
+                        })
 
-                # Check inheritance references
-                for inherit_info in deps["tree"]["inheritance"]:
-                    if inherit_info.get("id") == element["id"]:
-                        # Found a class that inherits from this element
-                        other_element = elements_by_id.get(other_id)
-                        if other_element and other_element["id"] != element["id"]:
-                            # Track this as a direct reference
-                            direct_reference_tracking[element["id"]].add(other_id)
-
-                            element["referenced_by"]["inheritance"].append(
-                                {
-                                    "id": other_id,
-                                    "name": other_element["name"],
-                                    "type": other_element["type"],
-                                    "file": other_element["file_path"],
-                                    "line": other_element["start_line"],
-                                    "context": "inherited_by",
-                                    "code": other_element["code"],
-                                    "source_location": {
-                                        "file": other_element["file_path"],
-                                        "start_line": other_element["start_line"],
-                                        "start_col": other_element["start_col"],
-                                        "end_line": other_element["end_line"],
-                                        "end_col": other_element["end_col"],
-                                    },
-                                }
-                            )
-
-                # Check general references
-                for ref_info in deps["tree"]["references"]:
-                    if ref_info.get("id") == element["id"]:
-                        # Found a general reference to this element
-                        other_element = elements_by_id.get(other_id)
-                        if other_element and other_element["id"] != element["id"]:
-                            # Track this as a direct reference
-                            direct_reference_tracking[element["id"]].add(other_id)
-
-                            element["referenced_by"]["references"].append(
-                                {
-                                    "id": other_id,
-                                    "name": other_element["name"],
-                                    "type": other_element["type"],
-                                    "file": other_element["file_path"],
-                                    "line": other_element["start_line"],
-                                    "context": "referenced_by",
-                                    "code": other_element["code"],
-                                    "source_location": {
-                                        "file": other_element["file_path"],
-                                        "start_line": other_element["start_line"],
-                                        "start_col": other_element["start_col"],
-                                        "end_line": other_element["end_line"],
-                                        "end_col": other_element["end_col"],
-                                    },
-                                }
-                            )
-
-        # Fourth pass: eliminate redundancies between dependencies and referenced_by
-        for element in code_elements:
-            # Get this element's dependencies
-            dependencies = element["dependencies"]["tree"]
-
-            # Remove references that are already included in more specific categories
-            self._remove_redundant_references(dependencies)
-
-            # Remove any elements from the general references that are also in direct references
-            self._remove_bidirectional_redundancies(element, direct_reference_tracking)
-
-        # Final verification: ensure dependencies and referenced_by are fully disjoint
+    # Fourth pass: clean up redundancies
+     for element in code_elements:
+        dependencies = element["dependencies"]["tree"]
+        self._remove_redundant_references(dependencies)
+        self._remove_bidirectional_redundancies(element, direct_reference_tracking)
         self._verify_no_bidirectional_references(element)
 
-        # Clean up temporary data before returning
-        for element in code_elements:
-            if "node" in element:
-                del element[
-                    "node"
-                ]  # Remove the node reference as it's not serializable
+     for element in code_elements:
+        if "node" in element:
+            del element["node"]
 
-        logger.info(f"Found {len(code_elements)} code elements in {file_path}")
-        return code_elements
+     logger.info(f"Found {len(code_elements)} code elements in {file_path}")
+     return code_elements
 
     def _remove_redundant_references(self, dependencies):
         """Remove references that are already included in more specific categories."""

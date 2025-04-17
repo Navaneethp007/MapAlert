@@ -58,13 +58,12 @@
     }
   ],
   "metadata": {
-    "last_analysis": "2025-04-15T14:15:44.279245",
+    "last_analysis": "2025-04-17T12:31:06.157193",
     "total_elements": 2,
     "processed_files": [
       "test.py",
       "App.js",
-      "Home.js",
-      "babel.config.js"
+      "Home.js"
     ]
   }
 }

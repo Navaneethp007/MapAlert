@@ -48,9 +48,9 @@ os.makedirs(DOCAI_DIR, exist_ok=True)
 LANGUAGE_EXTENSIONS = {
     ".py": "python",
     ".js": "javascript",
-    ".jsx": "javascript",
+    ".jsx": "tsx",
     ".ts": "typescript",
-    ".tsx": "typescript",
+    ".tsx": "tsx",
     ".java": "java",
     ".go": "go",
     ".rs": "rust",
@@ -348,18 +348,24 @@ class CodeAnalyzer:
 
                 # Arrow functions with variable declarations
                 elif node.type == "variable_declaration":
-                    declarator = node.child_by_field_name("declarator")
-                    if declarator:
-                        name_node = declarator.child_by_field_name("name")
-                        value_node = declarator.child_by_field_name("value")
-                        if name_node and value_node:
-                         if value_node.type in ["arrow_function", "function"]:
+                  declarator = node.child_by_field_name("declarator")
+                  if declarator:
+                      name_node = declarator.child_by_field_name("name")
+                      value_node = declarator.child_by_field_name("value")
+                      if name_node and value_node:
+                          if value_node.type in ["arrow_function", "function"]:
                             logger.info(f"Found function (variable): {name_node.text.decode('utf-8')}")
                             return {
                                 "type": "function",
                                 "name": name_node.text.decode("utf-8"),
                             }
-                         elif self._is_module_level(node):
+                          elif value_node.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]:
+                            logger.info(f"Found React component: {name_node.text.decode('utf-8')}")
+                            return {
+                                "type": "component",
+                                "name": name_node.text.decode("utf-8"),
+                            }
+                          elif self._is_module_level(node):
                             logger.info(f"Found variable: {name_node.text.decode('utf-8')}")
                             return {
                                 "type": "variable_definition",

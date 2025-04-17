@@ -199,6 +199,14 @@ class CodeAnalyzer:
             Language name or None if not supported
         """
         extension = os.path.splitext(file_path)[1].lower()
+        if extension == ".js":
+         try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                if "React" in content or "<" in content:
+                    return "tsx"
+         except:
+            pass
         return LANGUAGE_EXTENSIONS.get(extension)
 
     def _iter_tree(self, node):
@@ -318,6 +326,7 @@ class CodeAnalyzer:
 
             # JavaScript/TypeScript handling
             elif lang_name in ["javascript", "typescript", "tsx"]:
+                logger.info(f"JS/TS node type: {node.type}, children: {[c.type for c in node.children]}")
                 if node.type == "function_declaration":
                     name_node = node.child_by_field_name("name")
                     if name_node:
@@ -1288,6 +1297,7 @@ class CodeAnalyzer:
 
     def _parse_file(self, file_path: str) -> List[Dict]:
      lang_name = self._get_file_language(file_path)
+     logger.info(f"File: {file_path}, exists: {os.path.exists(file_path)}, lang: {lang_name}")
      if not lang_name or lang_name not in self.languages:
         logger.info(f"Cannot parse {file_path}: Language {lang_name} not supported")
         return []

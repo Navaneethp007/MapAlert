@@ -326,7 +326,7 @@ class CodeAnalyzer:
 
             # JavaScript/TypeScript handling
             elif lang_name in ["javascript", "typescript", "tsx"]:
-                logger.info(f"JS/TS node type: {node.type}, children: {[c.type for c in node.children]}")
+                # logger.info(f"JS/TS node type: {node.type}, children: {[c.type for c in node.children]}")
                 if node.type == "function_declaration":
                     name_node = node.child_by_field_name("name")
                     if name_node:
@@ -334,7 +334,7 @@ class CodeAnalyzer:
                             "type": "function",
                             "name": name_node.text.decode("utf-8"),
                         }
-
+    
                 elif node.type == "class_declaration":
                     name_node = node.child_by_field_name("name")
                     if name_node:
@@ -355,96 +355,127 @@ class CodeAnalyzer:
                                 "name": f"{class_name}.{method_name}",
                             }
 
-                # Arrow functions with variable declarations
-                elif node.type == "variable_declaration":
-                  declarator = node.child_by_field_name("declarator")
-                  if declarator:
-                      name_node = declarator.child_by_field_name("name")
-                      value_node = declarator.child_by_field_name("value")
-                      if name_node and value_node:
-                          if value_node.type in ["arrow_function", "function"]:
-                            logger.info(f"Found function (variable): {name_node.text.decode('utf-8')}")
-                            return {
-                                "type": "function",
-                                "name": name_node.text.decode("utf-8"),
-                            }
-                          elif value_node.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]:
-                            logger.info(f"Found React component: {name_node.text.decode('utf-8')}")
+                elif node.type == "lexical_declaration":
+        # Handle const/let/var declarations (e.g., const HomeScreen = () => { ... })
+                  for declarator in node.named_children:
+                   if declarator.type == "variable_declarator":
+                     name_node = declarator.child_by_field_name("name")
+                     value_node = declarator.child_by_field_name("value")
+                     if name_node and value_node:
+                      name = name_node.text.decode("utf-8")
+                      if value_node.type == "arrow_function" or value_node.type == "function_expression":
+                        # Check for JSX in the function body to identify React components
+                        body = value_node.child_by_field_name("body")
+                        has_jsx = False
+                        if body:
+                            for child in self._iter_tree(body):
+                                if child.type in [
+                                    "jsx_element",
+                                    "jsx_self_closing_element",
+                                    "jsx_fragment",
+                                ]:
+                                    has_jsx = True
+                                    break
+                        if has_jsx:
+                            logger.info(f"Found React component: {name}")
                             return {
                                 "type": "component",
-                                "name": name_node.text.decode("utf-8"),
+                                "name": name,
                             }
-                          elif self._is_module_level(node):
-                            logger.info(f"Found variable: {name_node.text.decode('utf-8')}")
+                        else:
+                            logger.info(f"Found function (arrow/function expression): {name}")
                             return {
-                                "type": "variable_definition",
-                                "name": name_node.text.decode("utf-8"),
+                                "type": "function",
+                                "name": name,
                             }
+                     elif value_node.type in [
+                        "jsx_element",
+                        "jsx_self_closing_element",
+                        "jsx_fragment",
+                    ]:
+                        logger.info(f"Found React component (direct JSX): {name}")
+                        return {
+                            "type": "component",
+                            "name": name,
+                        }
+                     elif self._is_module_level(node):
+                        logger.info(f"Found variable: {name}")
+                        return {
+                            "type": "variable_definition",
+                            "name": name,
+                        }
 
-                # Handle export default function
                 elif node.type == "export_statement":
-                    declaration = node.child_by_field_name("declaration")
-                    if declaration and declaration.type == "function_declaration":
-                        return None
-                        # name_node = declaration.child_by_field_name("name")
-                        # if name_node:
-                        #     return {
-                        #         "type": "function",
-                        #         "name": name_node.text.decode("utf-8"),
-                        #     }
+        # Handle export default declarations
+                 declaration = node.child_by_field_name("declaration")
+                 if declaration and declaration.type == "function_declaration":
+                     name_node = declaration.child_by_field_name("name")
+                     if name_node:
+                         logger.info(f"Found exported function: {name_node.text.decode('utf-8')}")
+                         return {
+                             "type": "function",
+                             "name": name_node.text.decode("utf-8"),
+                         }
+                 elif declaration and declaration.type == "lexical_declaration":
+            # Handle export default const/let/var
+                     for declarator in declaration.named_children:
+                         if declarator.type == "variable_declarator":
+                             name_node = declarator.child_by_field_name("name")
+                             value_node = declarator.child_by_field_name("value")
+                             if name_node and value_node:
+                                 name = name_node.text.decode("utf-8")
+                                 if value_node.type == "arrow_function" or value_node.type == "function_expression":
+                                     body = value_node.child_by_field_name("body")
+                                     has_jsx = False
+                                     if body:
+                                         for child in self._iter_tree(body):
+                                             if child.type in [
+                                                 "jsx_element",
+                                                 "jsx_self_closing_element",
+                                                 "jsx_fragment",
+                                             ]:
+                                                 has_jsx = True
+                                                 break
+                                     if has_jsx:
+                                         logger.info(f"Found exported React component: {name}")
+                                         return {
+                                             "type": "component",
+                                             "name": name,
+                                         }
+                                     else:
+                                         logger.info(f"Found exported function: {name}")
+                                         return {
+                                             "type": "function",
+                                             "name": name,
+                                         }
 
-                # Handle import statements at module level
-                elif node.type == "import_declaration" and self._is_module_level(node):
-                    # Generate a unique name for the import
-                    import_text = (
-                        content[node.start_byte : node.end_byte]
-                        .decode("utf-8", errors="replace")
-                        .strip()
-                    )
-                    import_hash = hashlib.md5(import_text.encode()).hexdigest()[:8]
-                    return {
-                        "type": "import_statement",
-                        "name": f"import_{import_hash}",
-                        "import_text": import_text,
-                    }
+            elif node.type == "import_declaration" and self._is_module_level(node):
+        # Handle import statements
+                 import_text = content[node.start_byte : node.end_byte].decode("utf-8", errors="replace").strip()
+                 import_hash = hashlib.md5(import_text.encode()).hexdigest()[:8]
+                 logger.info(f"Found import: import_{import_hash}")
+                 return {
+                     "type": "import_statement",
+                     "name": f"import_{import_hash}",
+                     "import_text": import_text,
+                 }
 
-                elif node.type == "export_default_declaration":
-                 expression = node.child_by_field_name("expression")
-                 if expression and expression.type == "arrow_function":
-                    # Try to find the parent variable name if assigned
-                    parent = node.parent
-                    name = "anonymous"
-                    if parent and parent.type == "variable_declarator":
-                        name_node = parent.child_by_field_name("name")
-                        if name_node:
-                            name = name_node.text.decode("utf-8")
-                    logger.info(f"Found arrow function: {name}")
-                    return {
-                        "type": "function",
-                        "name": name,
-                    }
-                 
-                 # Handle require statements at module level
-                elif (
-                    node.type == "call_expression"
-                    and node.child_by_field_name("function")
-                    and node.child_by_field_name("function").type == "identifier"
-                    and node.child_by_field_name("function").text.decode("utf-8")
-                    == "require"
-                    and self._is_module_level(node)
-                ):
-                    # Generate a unique name for the require
-                    require_text = (
-                        content[node.start_byte : node.end_byte]
-                        .decode("utf-8", errors="replace")
-                        .strip()
-                    )
-                    require_hash = hashlib.md5(require_text.encode()).hexdigest()[:8]
-                    return {
-                        "type": "import_statement",
-                        "name": f"require_{require_hash}",
-                        "import_text": require_text,
-                    }
+            elif (
+                 node.type == "call_expression"
+                 and node.child_by_field_name("function")
+                 and node.child_by_field_name("function").type == "identifier"
+                 and node.child_by_field_name("function").text.decode("utf-8") == "require"
+                 and self._is_module_level(node)
+             ):
+        # Handle require statements
+                 require_text = content[node.start_byte : node.end_byte].decode("utf-8", errors="replace").strip()
+                 require_hash = hashlib.md5(require_text.encode()).hexdigest()[:8]
+                 logger.info(f"Found require: require_{require_hash}")
+                 return {
+                     "type": "import_statement",
+                     "name": f"require_{require_hash}",
+                     "import_text": require_text,
+                 }
 
             # Java-specific handling
             elif lang_name == "java":

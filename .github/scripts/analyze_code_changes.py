@@ -168,6 +168,8 @@ class CodeAnalyzer:
             "docs/*",
             "*.md",
             ".docai/*",
+            "babel.config.js",
+
             # Add more standard exclusions here
         ]
 
@@ -350,21 +352,18 @@ class CodeAnalyzer:
                     if declarator:
                         name_node = declarator.child_by_field_name("name")
                         value_node = declarator.child_by_field_name("value")
-                        if (
-                            name_node
-                            and value_node
-                            and value_node.type in ["arrow_function", "function"]
-                        ):
+                        if name_node and value_node:
+                         if value_node.type in ["arrow_function", "function"]:
+                            logger.info(f"Found function (variable): {name_node.text.decode('utf-8')}")
                             return {
                                 "type": "function",
                                 "name": name_node.text.decode("utf-8"),
                             }
-                        # Handle variable declarations at module level
-                        elif name_node and self._is_module_level(node):
-                            var_name = name_node.text.decode("utf-8")
+                         elif self._is_module_level(node):
+                            logger.info(f"Found variable: {name_node.text.decode('utf-8')}")
                             return {
                                 "type": "variable_definition",
-                                "name": var_name,
+                                "name": name_node.text.decode("utf-8"),
                             }
 
                 # Handle export default function
@@ -372,6 +371,12 @@ class CodeAnalyzer:
                     declaration = node.child_by_field_name("declaration")
                     if declaration and declaration.type == "function_declaration":
                         return None
+                        # name_node = declaration.child_by_field_name("name")
+                        # if name_node:
+                        #     return {
+                        #         "type": "function",
+                        #         "name": name_node.text.decode("utf-8"),
+                        #     }
 
                 # Handle import statements at module level
                 elif node.type == "import_declaration" and self._is_module_level(node):
@@ -388,7 +393,23 @@ class CodeAnalyzer:
                         "import_text": import_text,
                     }
 
-                # Handle require statements at module level
+                elif node.type == "export_default_declaration":
+                 expression = node.child_by_field_name("expression")
+                 if expression and expression.type == "arrow_function":
+                    # Try to find the parent variable name if assigned
+                    parent = node.parent
+                    name = "anonymous"
+                    if parent and parent.type == "variable_declarator":
+                        name_node = parent.child_by_field_name("name")
+                        if name_node:
+                            name = name_node.text.decode("utf-8")
+                    logger.info(f"Found arrow function: {name}")
+                    return {
+                        "type": "function",
+                        "name": name,
+                    }
+                 
+                 # Handle require statements at module level
                 elif (
                     node.type == "call_expression"
                     and node.child_by_field_name("function")
@@ -600,14 +621,14 @@ class CodeAnalyzer:
                   property: (property_identifier) @method.call)
               ])
 
-            ; Import declarations
-            (import_declaration
-              (import_clause 
-                [(namespace_import (identifier) @import.name)
-                 (named_imports (import_specifier
-                   name: (identifier) @import.name))
-                 (identifier) @import.name])
-              source: (string) @import.source)
+            # ; Import declarations
+            # (import_declaration
+            #   (import_clause 
+            #     [(namespace_import (identifier) @import.name)
+            #      (named_imports (import_specifier
+            #        name: (identifier) @import.name))
+            #      (identifier) @import.name])
+            #   source: (string) @import.source)
 
             ; Require statements
             (call_expression

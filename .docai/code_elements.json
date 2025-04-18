@@ -29,7 +29,7 @@
       }
     },
     {
-      "type": "function",
+      "type": "component",
       "name": "App",
       "code": "export default function App() {\n  return (\n    <View >\n      <HomeScreen/>\n    </View>\n  );\n}",
       "start_line": 5,
@@ -37,7 +37,7 @@
       "end_line": 11,
       "end_col": 1,
       "file_path": "App.js",
-      "id": "1454044a05f8c86a8befe2d899deecb7",
+      "id": "156c0a4ccab705a3c67714641a4eb85f",
       "dependencies": {
         "tree": {
           "functions": {},
@@ -57,7 +57,7 @@
       }
     },
     {
-      "type": "function",
+      "type": "component",
       "name": "App",
       "code": "function App() {\n  return (\n    <View >\n      <HomeScreen/>\n    </View>\n  );\n}",
       "start_line": 5,
@@ -65,7 +65,7 @@
       "end_line": 11,
       "end_col": 1,
       "file_path": "App.js",
-      "id": "1454044a05f8c86a8befe2d899deecb7",
+      "id": "156c0a4ccab705a3c67714641a4eb85f",
       "dependencies": {
         "tree": {
           "functions": {},
@@ -113,15 +113,15 @@
       }
     },
     {
-      "type": "function",
-      "name": "handlecord",
-      "code": "const handlecord=(event)=>{\n    setMcoords(event.nativeEvent.coordinate);\n  }",
-      "start_line": 36,
+      "type": "variable_definition",
+      "name": "[location, setLocation]",
+      "code": "const [location, setLocation] = useState(null);",
+      "start_line": 8,
       "start_col": 2,
-      "end_line": 38,
-      "end_col": 3,
+      "end_line": 8,
+      "end_col": 49,
       "file_path": "Home.js",
-      "id": "801b99fafb41d27d0c31d11784bf1e87",
+      "id": "7c79d29fdcff2a0075ea064b19877141",
       "dependencies": {
         "tree": {
           "functions": {},
@@ -141,15 +141,15 @@
       }
     },
     {
-      "type": "function",
-      "name": "handleSearch",
-      "code": "const handleSearch=(text)=>{\n    setSearchtext(text);\n  }",
-      "start_line": 39,
+      "type": "variable_definition",
+      "name": "[mcoords, setMcoords]",
+      "code": "const [mcoords, setMcoords] = useState(null);",
+      "start_line": 9,
       "start_col": 2,
-      "end_line": 41,
-      "end_col": 3,
+      "end_line": 9,
+      "end_col": 47,
       "file_path": "Home.js",
-      "id": "87e4cfa2f81397e5222b0006811d707d",
+      "id": "f89b67f4229acc9598124a4f7a58d08e",
       "dependencies": {
         "tree": {
           "functions": {},
@@ -169,15 +169,15 @@
       }
     },
     {
-      "type": "function",
-      "name": "calculateDistance",
-      "code": "const calculateDistance=(c1, c2)=>{\n    const lat1 = c1.latitude;\n    const lon1 = c1.longitude;\n    const lat2 = c2.latitude;\n    const lon2 = c2.longitude;\n    const p = 0.017453292519943295;\n    const c = Math.cos;\n    const a = 0.5 - c((lat2 - lat1) * p)/2 + \n              c(lat1 * p) * c(lat2 * p) * \n              (1 - c((lon2 - lon1) * p))/2;\n\n    return 12742 * Math.asin(Math.sqrt(a));\n  }",
-      "start_line": 42,
+      "type": "variable_definition",
+      "name": "[scoords, setScoords]",
+      "code": "const [scoords, setScoords] = useState(null);",
+      "start_line": 10,
       "start_col": 2,
-      "end_line": 54,
-      "end_col": 3,
+      "end_line": 10,
+      "end_col": 47,
       "file_path": "Home.js",
-      "id": "398388e2dc100fbcc41cb2093bbb1ea7",
+      "id": "321eb5a19a1b8320a858f64f04ad3010",
       "dependencies": {
         "tree": {
           "functions": {},
@@ -197,15 +197,407 @@
       }
     },
     {
-      "type": "function",
+      "type": "variable_definition",
+      "name": "[errorMsg, setErrorMsg]",
+      "code": "const [errorMsg, setErrorMsg] = useState(null);",
+      "start_line": 11,
+      "start_col": 2,
+      "end_line": 11,
+      "end_col": 49,
+      "file_path": "Home.js",
+      "id": "132a3891c9002bdccee4d84d21586dd1",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "[searchtext, setSearchtext]",
+      "code": "const [searchtext, setSearchtext] = useState('');",
+      "start_line": 12,
+      "start_col": 2,
+      "end_line": 12,
+      "end_col": 51,
+      "file_path": "Home.js",
+      "id": "5c1e84fd94c58472bc53bbe80d1aeb34",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "{ status }",
+      "code": "let { status } = await Location.requestForegroundPermissionsAsync();",
+      "start_line": 15,
+      "start_col": 6,
+      "end_line": 15,
+      "end_col": 74,
+      "file_path": "Home.js",
+      "id": "18fbeb6c3591603f28eb17c88621c94d",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "{ coords }",
+      "code": "let { coords } = await Location.getCurrentPositionAsync({});",
+      "start_line": 20,
+      "start_col": 6,
+      "end_line": 20,
+      "end_col": 66,
+      "file_path": "Home.js",
+      "id": "dfbd617f515f4e6257864106c683051a",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "distance",
+      "code": "const distance = calculateDistance(location,mcoords);",
+      "start_line": 26,
+      "start_col": 6,
+      "end_line": 26,
+      "end_col": 59,
+      "file_path": "Home.js",
+      "id": "e3fe8c8cf718853d5e9ab572dda25070",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "distance2",
+      "code": "const distance2 = calculateDistance(location,scoords);",
+      "start_line": 27,
+      "start_col": 6,
+      "end_line": 27,
+      "end_col": 60,
+      "file_path": "Home.js",
+      "id": "110e6d2f3e8ecacf0a906d2da05461b1",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "lat1",
+      "code": "const lat1 = c1.latitude;",
+      "start_line": 43,
+      "start_col": 4,
+      "end_line": 43,
+      "end_col": 29,
+      "file_path": "Home.js",
+      "id": "ca0ad27ea45d93dfb2a78211cdb90077",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "lon1",
+      "code": "const lon1 = c1.longitude;",
+      "start_line": 44,
+      "start_col": 4,
+      "end_line": 44,
+      "end_col": 30,
+      "file_path": "Home.js",
+      "id": "c0bfa775c08fe99709188ad5419b3579",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "lat2",
+      "code": "const lat2 = c2.latitude;",
+      "start_line": 45,
+      "start_col": 4,
+      "end_line": 45,
+      "end_col": 29,
+      "file_path": "Home.js",
+      "id": "90620c1c33a22302edb9a11f7873f9b6",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "lon2",
+      "code": "const lon2 = c2.longitude;",
+      "start_line": 46,
+      "start_col": 4,
+      "end_line": 46,
+      "end_col": 30,
+      "file_path": "Home.js",
+      "id": "d78c72d1c655e86fd0e2068c5b6c1b4e",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "p",
+      "code": "const p = 0.017453292519943295;",
+      "start_line": 47,
+      "start_col": 4,
+      "end_line": 47,
+      "end_col": 35,
+      "file_path": "Home.js",
+      "id": "b866ed3c5c7c4999c532cd31771597f2",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "c",
+      "code": "const c = Math.cos;",
+      "start_line": 48,
+      "start_col": 4,
+      "end_line": 48,
+      "end_col": 23,
+      "file_path": "Home.js",
+      "id": "d4f6a63320520e7d31d07804578fb2af",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "a",
+      "code": "const a = 0.5 - c((lat2 - lat1) * p)/2 + \n              c(lat1 * p) * c(lat2 * p) * \n              (1 - c((lon2 - lon1) * p))/2;",
+      "start_line": 49,
+      "start_col": 4,
+      "end_line": 51,
+      "end_col": 43,
+      "file_path": "Home.js",
+      "id": "159d9033d72ff5fb90efe5bad9ba6055",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
       "name": "geocode",
-      "code": "const geocode = async () => {\n    let geocode = await Location.geocodeAsync(searchtext);\n    setScoords(geocode[0]);\n  }",
-      "start_line": 55,
-      "start_col": 2,
-      "end_line": 58,
+      "code": "let geocode = await Location.geocodeAsync(searchtext);",
+      "start_line": 56,
+      "start_col": 4,
+      "end_line": 56,
+      "end_col": 58,
+      "file_path": "Home.js",
+      "id": "6886d7a25f21aa3704800b9d91528fc7",
+      "dependencies": {
+        "tree": {
+          "functions": {},
+          "classes": {},
+          "variables": {},
+          "calls": [],
+          "inheritance": [],
+          "references": []
+        }
+      },
+      "referenced_by": {
+        "functions": {},
+        "classes": {},
+        "variables": {},
+        "inheritance": [],
+        "references": []
+      }
+    },
+    {
+      "type": "variable_definition",
+      "name": "styles",
+      "code": "const styles = StyleSheet.create({\n\n  map: {\n    width: '100%',\n    height: '100%'\n  },\n\n});",
+      "start_line": 112,
+      "start_col": 0,
+      "end_line": 119,
       "end_col": 3,
       "file_path": "Home.js",
-      "id": "538f6df308d5e56826714576545de0f6",
+      "id": "83ab7909a2ab5bcb46a004f9a571dc25",
       "dependencies": {
         "tree": {
           "functions": {},
@@ -226,8 +618,8 @@
     }
   ],
   "metadata": {
-    "last_analysis": "2025-04-18T09:11:06.406209",
-    "total_elements": 8,
+    "last_analysis": "2025-04-18T12:03:38.193167",
+    "total_elements": 22,
     "processed_files": [
       "test.py",
       "App.js",

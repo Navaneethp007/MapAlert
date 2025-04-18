@@ -330,8 +330,16 @@ class CodeAnalyzer:
                 if node.type == "function_declaration":
                     name_node = node.child_by_field_name("name")
                     if name_node:
+                        body = node.child_by_field_name("body")
+                        has_jsx = False
+                        if body:
+                            for child in self._iter_tree(body):
+                                if child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]:
+                                    has_jsx = True
+                                    break
+                        logger.info(f"Found {'component' if has_jsx else 'function'}: {name_node.text.decode('utf-8')}")
                         return {
-                            "type": "function",
+                            "type": "component" if has_jsx else "function",
                             "name": name_node.text.decode("utf-8"),
                         }
 
@@ -346,9 +354,7 @@ class CodeAnalyzer:
                         # Get class name if this is a method
                         class_node = self._find_parent_class(node)
                         if class_node:
-                            class_name = class_node.child_by_field_name(
-                                "name"
-                            ).text.decode("utf-8")
+                            class_name = class_node.child_by_field_name("name").text.decode("utf-8")
                             method_name = name_node.text.decode("utf-8")
                             return {
                                 "type": "method",
@@ -356,126 +362,102 @@ class CodeAnalyzer:
                             }
 
                 elif node.type == "lexical_declaration":
-                    # Handle const/let/var declarations (e.g., const HomeScreen = () => { ... })
                     for declarator in node.named_children:
                         if declarator.type == "variable_declarator":
                             name_node = declarator.child_by_field_name("name")
                             value_node = declarator.child_by_field_name("value")
                             if name_node and value_node:
                                 name = name_node.text.decode("utf-8")
-                                if value_node.type == "arrow_function" or value_node.type == "function_expression":
-                                    # Check for JSX in the function body to identify React components
+                                if value_node.type in ["arrow_function", "function_expression"]:
                                     body = value_node.child_by_field_name("body")
                                     has_jsx = False
                                     if body:
                                         for child in self._iter_tree(body):
-                                            if child.type in [
-                                    "jsx_element",
-                                    "jsx_self_closing_element",
-                                    "jsx_fragment",
-                                ]:
+                                            if child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]:
                                                 has_jsx = True
                                                 break
-                                    if has_jsx:
-                                        logger.info(f"Found React component: {name}")
-                                        return {
-                                "type": "component",
-                                "name": name,
-                            }
-                                    else:
-                                        logger.info(f"Found function (arrow/function expression): {name}")
-                                        return {
-                                "type": "function",
-                                "name": name,
-                            }
-                            elif value_node.type in [
-                        "jsx_element",
-                        "jsx_self_closing_element",
-                        "jsx_fragment",
-                    ]:
-                                logger.info(f"Found React component (direct JSX): {name}")
-                                return {
-                            "type": "component",
-                            "name": name,
-                        }
-                            elif self._is_module_level(node):
-                                logger.info(f"Found variable: {name}")
-                                return {
-                            "type": "variable_definition",
-                            "name": name,
-                        }
+                                    logger.info(f"Found {'component' if has_jsx else 'function'}: {name}")
+                                    return {
+                                        "type": "component" if has_jsx else "function",
+                                        "name": name,
+                                    }
+                                elif value_node.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]:
+                                    logger.info(f"Found component (direct JSX): {name}")
+                                    return {
+                                        "type": "component",
+                                        "name": name,
+                                    }
+                                elif self._is_module_level(node):
+                                    logger.info(f"Found variable: {name}")
+                                    return {
+                                        "type": "variable_definition",
+                                        "name": name,
+                                    }
 
                 elif node.type == "export_statement":
-                    # Handle export default declarations
                     declaration = node.child_by_field_name("declaration")
-                    if declaration and declaration.type == "function_declaration":
-                        name_node = declaration.child_by_field_name("name")
-                        if name_node:
-                            logger.info(f"Found exported function: {name_node.text.decode('utf-8')}")
-                            return {
-                             "type": "function",
-                             "name": name_node.text.decode("utf-8"),
-                         }
-                    elif declaration and declaration.type == "lexical_declaration":
-                        # Handle export default const/let/var
-                        for declarator in declaration.named_children:
-                            if declarator.type == "variable_declarator":
-                                name_node = declarator.child_by_field_name("name")
-                                value_node = declarator.child_by_field_name("value")
-                                if name_node and value_node:
-                                    name = name_node.text.decode("utf-8")
-                                    if value_node.type == "arrow_function" or value_node.type == "function_expression":
-                                        body = value_node.child_by_field_name("body")
-                                        has_jsx = False
-                                        if body:
-                                            for child in self._iter_tree(body):
-                                                if child.type in [
-                                                 "jsx_element",
-                                                 "jsx_self_closing_element",
-                                                 "jsx_fragment",
-                                             ]:
-                                                    has_jsx = True
-                                                    break
-                                        if has_jsx:
-                                            logger.info(f"Found exported React component: {name}")
+                    if declaration:
+                        if declaration.type == "function_declaration":
+                            name_node = declaration.child_by_field_name("name")
+                            if name_node:
+                                body = declaration.child_by_field_name("body")
+                                has_jsx = False
+                                if body:
+                                    for child in self._iter_tree(body):
+                                        if child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]:
+                                            has_jsx = True
+                                            break
+                                logger.info(f"Found exported {'component' if has_jsx else 'function'}: {name_node.text.decode('utf-8')}")
+                                return {
+                                    "type": "component" if has_jsx else "function",
+                                    "name": name_node.text.decode("utf-8"),
+                                }
+                        elif declaration.type == "lexical_declaration":
+                            for declarator in declaration.named_children:
+                                if declarator.type == "variable_declarator":
+                                    name_node = declarator.child_by_field_name("name")
+                                    value_node = declarator.child_by_field_name("value")
+                                    if name_node and value_node:
+                                        name = name_node.text.decode("utf-8")
+                                        if value_node.type in ["arrow_function", "function_expression"]:
+                                            body = value_node.child_by_field_name("body")
+                                            has_jsx = False
+                                            if body:
+                                                for child in self._iter_tree(body):
+                                                    if child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]:
+                                                        has_jsx = True
+                                                        break
+                                            logger.info(f"Found exported {'component' if has_jsx else 'function'}: {name}")
                                             return {
-                                             "type": "component",
-                                             "name": name,
-                                         }
-                                        else:
-                                            logger.info(f"Found exported function: {name}")
-                                            return {
-                                             "type": "function",
-                                             "name": name,
-                                         }
+                                                "type": "component" if has_jsx else "function",
+                                                "name": name,
+                                            }
 
-            elif node.type == "import_declaration" and self._is_module_level(node):
-                # Handle import statements
-                import_text = content[node.start_byte : node.end_byte].decode("utf-8", errors="replace").strip()
-                import_hash = hashlib.md5(import_text.encode()).hexdigest()[:8]
-                logger.info(f"Found import: import_{import_hash}")
-                return {
-                     "type": "import_statement",
-                     "name": f"import_{import_hash}",
-                     "import_text": import_text,
-                 }
+                elif node.type == "import_declaration" and self._is_module_level(node):
+                    import_text = content[node.start_byte : node.end_byte].decode("utf-8", errors="replace").strip()
+                    import_hash = hashlib.md5(import_text.encode()).hexdigest()[:8]
+                    logger.info(f"Found import: import_{import_hash}")
+                    return {
+                        "type": "import_statement",
+                        "name": f"import_{import_hash}",
+                        "import_text": import_text,
+                    }
 
-            elif (
-                 node.type == "call_expression"
-                 and node.child_by_field_name("function")
-                 and node.child_by_field_name("function").type == "identifier"
-                 and node.child_by_field_name("function").text.decode("utf-8") == "require"
-                 and self._is_module_level(node)
-             ):
-                # Handle require statements
-                require_text = content[node.start_byte : node.end_byte].decode("utf-8", errors="replace").strip()
-                require_hash = hashlib.md5(require_text.encode()).hexdigest()[:8]
-                logger.info(f"Found require: require_{require_hash}")
-                return {
-                     "type": "import_statement",
-                     "name": f"require_{require_hash}",
-                     "import_text": require_text,
-                 }
+                elif (
+                    node.type == "call_expression"
+                    and node.child_by_field_name("function")
+                    and node.child_by_field_name("function").type == "identifier"
+                    and node.child_by_field_name("function").text.decode("utf-8") == "require"
+                    and self._is_module_level(node)
+                ):
+                    require_text = content[node.start_byte : node.end_byte].decode("utf-8", errors="replace").strip()
+                    require_hash = hashlib.md5(require_text.encode()).hexdigest()[:8]
+                    logger.info(f"Found require: require_{require_hash}")
+                    return {
+                        "type": "import_statement",
+                        "name": f"require_{require_hash}",
+                        "import_text": require_text,
+                    }
 
             # Java-specific handling
             elif lang_name == "java":
@@ -658,32 +640,36 @@ class CodeAnalyzer:
             """
         elif lang_name in ["javascript", "typescript", "tsx", "jsx"]:
             query_str = """
-            # --- Modified: Added JSX component usage detection ---
             ; Function calls
             (call_expression
-              function: [
+            function: [
                 (identifier) @function.call
                 (member_expression
-                  object: (identifier) @class.ref
-                  property: (property_identifier) @method.call)
-              ])
+                object: (identifier) @class.ref
+                property: (property_identifier) @method.call)
+            ])
 
             ; Component usage (JSX elements)
             (jsx_element
-              open_tag: (jsx_opening_element
+            open_tag: (jsx_opening_element
                 name: (identifier) @component.use))
             (jsx_self_closing_element
-              name: (identifier) @component.use)
+            name: (identifier) @component.use)
+
+            ; Hook calls
+            (call_expression
+            function: (identifier) @hook.call
+            (#match? @hook.call "^use[A-Z]"))
 
             ; Require statements
             (call_expression
-              function: (identifier) @require
-              arguments: [(string) @import.name]
-              (#eq? @require "require"))
+            function: (identifier) @require
+            arguments: [(string) @import.name]
+            (#eq? @require "require"))
 
             ; Class inheritance
             (class_declaration
-              superClass: (identifier) @class.inherit)
+            superClass: (identifier) @class.inherit)
 
             ; Variable references
             (identifier) @variable.ref
@@ -718,6 +704,9 @@ class CodeAnalyzer:
                     node, content, elements_by_name, dependencies, current_element_id
                 )
                 self._extract_import_usage(  # Highlight: New method call
+                    node, content, elements_by_name, dependencies, current_element_id
+                )
+                self._extract_hook_usage(
                     node, content, elements_by_name, dependencies, current_element_id
                 )
                 # enabling tracking of <AnotherComponent /> and imported names.
@@ -1446,6 +1435,45 @@ class CodeAnalyzer:
     # Annotation: New method to track imported components/variables (e.g., import AnotherComponent)
     # and add them as dependencies if used, enabling cross-file reference tracking.
 
+    def _extract_hook_usage(
+    self, node, content, elements_by_name, dependencies, current_element_id=None
+    ):
+        try:
+            if node.type == "call_expression":
+                func_node = node.child_by_field_name("function")
+                if func_node and func_node.type == "identifier":
+                    func_name = func_node.text.decode("utf-8")
+                    if func_name.startswith("use") and func_name[3].isupper():
+                        if func_name in elements_by_name:
+                            element = elements_by_name[func_name]
+                            if element.get("id") != current_element_id:
+                                hook_code = content[node.start_byte : node.end_byte].decode(
+                                    "utf-8", errors="replace"
+                                )
+                                dependencies["tree"]["references"].append({
+                                    "name": func_name,
+                                    "type": "hook_reference",
+                                    "id": element.get("id", ""),
+                                    "file": element.get("file_path", ""),
+                                    "line": element.get("start_line", 0),
+                                    "context": "hook_usage",
+                                    "code": element.get("code", ""),
+                                    "source_location": {
+                                        "file": os.path.relpath(self.current_file, self.repo_path),
+                                        "start_line": node.start_point[0] + 1,
+                                        "start_col": node.start_point[1],
+                                        "end_line": node.end_point[0] + 1,
+                                        "end_col": node.end_point[1],
+                                    },
+                                })
+
+            for child in node.children:
+                self._extract_hook_usage(
+                    child, content, elements_by_name, dependencies, current_element_id
+                )
+        except Exception as e:
+            logger.error(f"Error extracting hook usage: {e}")
+
     def _parse_file(self, file_path: str) -> List[Dict]:
         lang_name = self._get_file_language(file_path)
         logger.info(f"File: {file_path}, exists: {os.path.exists(file_path)}, lang: {lang_name}")
@@ -1473,6 +1501,7 @@ class CodeAnalyzer:
         code_elements = []
         elements_by_name = {}
         elements_by_id = {}
+        component_scope = None
 
         for node in self._iter_tree(tree.root_node):
             element_info = self._get_element_info(node, content, lang_name)
@@ -1498,10 +1527,25 @@ class CodeAnalyzer:
                     element["code"] = self._format_code(element["code"])
                     element_id = self._generate_element_id(element)
                     element["id"] = element_id
-
-                    elements_by_name[element_info["name"]] = element
-                    elements_by_id[element_id] = element
-                    code_elements.append(element)
+                    if element["type"] == "component":
+                        component_scope = element
+                        elements_by_name[element_info["name"]] = element
+                        elements_by_id[element_id] = element
+                        code_elements.append(element)
+                    elif element["type"] == "function" and component_scope:
+                        # Internal function within a component
+                        if node.start_point[0] > component_scope["start_line"] and node.end_point[0] < component_scope["end_line"]:
+                            elements_by_name[element_info["name"]] = element
+                            elements_by_id[element_id] = element
+                            # Don't add to code_elements; track as dependency later
+                        else:
+                            elements_by_name[element_info["name"]] = element
+                            elements_by_id[element_id] = element
+                            code_elements.append(element)
+                    else:
+                        elements_by_name[element_info["name"]] = element
+                        elements_by_id[element_id] = element
+                        code_elements.append(element)
 
                 except Exception as e:
                     logger.error(f"Error processing element {element_info['name']} in {file_path}: {e}")
@@ -1962,7 +2006,7 @@ class CodeAnalyzer:
 
         for element in all_code_elements:
             if "node" in element:
-               del element["node"]
+                del element["node"]
 
         result = {
             "elements": all_code_elements,

@@ -58,36 +58,8 @@
     },
     {
       "type": "component",
-      "name": "App",
-      "code": "function App() {\n  return (\n    <View >\n      <HomeScreen/>\n    </View>\n  );\n}",
-      "start_line": 5,
-      "start_col": 15,
-      "end_line": 11,
-      "end_col": 1,
-      "file_path": "App.js",
-      "id": "156c0a4ccab705a3c67714641a4eb85f",
-      "dependencies": {
-        "tree": {
-          "functions": {},
-          "classes": {},
-          "variables": {},
-          "calls": [],
-          "inheritance": [],
-          "references": []
-        }
-      },
-      "referenced_by": {
-        "functions": {},
-        "classes": {},
-        "variables": {},
-        "inheritance": [],
-        "references": []
-      }
-    },
-    {
-      "type": "component",
       "name": "HomeScreen",
-      "code": "const HomeScreen = () => {\n  const [location, setLocation] = useState(null);\n  const [mcoords, setMcoords] = useState(null);\n  const [scoords, setScoords] = useState(null);\n  const [errorMsg, setErrorMsg] = useState(null);\n  const [searchtext, setSearchtext] = useState('');\n  useEffect(() => {\n    (async () => {\n      let { status } = await Location.requestForegroundPermissionsAsync();\n      if (status !== 'granted') {\n        setErrorMsg('Permission to access location was denied');\n        return;\n      }\n      let { coords } = await Location.getCurrentPositionAsync({});\n      setLocation(coords);\n    })();\n  }, []);\n  useEffect(() => {\n    if(location && mcoords){\n      const distance = calculateDistance(location,mcoords);\n      const distance2 = calculateDistance(location,scoords);\n      if(distance<=2 || distance2<=2)\n      {\n        Vibration.vibrate([1000, 500, 1000]);\n        alert(\"Da Mandaaaa, STHALAM EHTARAYI!!!!!\");\n      }\n      //setShowVib(false);\n    }\n  },[location,mcoords]);\n  const handlecord=(event)=>{\n    setMcoords(event.nativeEvent.coordinate);\n  }\n  const handleSearch=(text)=>{\n    setSearchtext(text);\n  }\n  const calculateDistance=(c1, c2)=>{\n    const lat1 = c1.latitude;\n    const lon1 = c1.longitude;\n    const lat2 = c2.latitude;\n    const lon2 = c2.longitude;\n    const p = 0.017453292519943295;\n    const c = Math.cos;\n    const a = 0.5 - c((lat2 - lat1) * p)/2 + \n              c(lat1 * p) * c(lat2 * p) * \n              (1 - c((lon2 - lon1) * p))/2;\n\n    return 12742 * Math.asin(Math.sqrt(a));\n  }\n  const geocode = async () => {\n    let geocode = await Location.geocodeAsync(searchtext);\n    setScoords(geocode[0]);\n  }\n  return (\n    <View>\n    <TextInput\n      style={{ marginTop:40, marginBottom:40, zIndex: 1, backgroundColor: 'white', padding: 10, width: '100%', position: 'absolute', top: 0, left: 0}}\n      placeholder=\"Type Here...\"\n      onChangeText={handleSearch}\n      value={searchtext}\n  />\n  <TouchableOpacity style={{position: 'absolute', top: 60, right: 0, zIndex: 1, backgroundColor: 'white', padding: 10}} onPress={geocode}>\n    <Text>Search</Text>\n  </TouchableOpacity>\n    {errorMsg ? (\n      <Text>{errorMsg}</Text>\n    ) : (\n       console.log(location)\n    )}\n      <MapView\n        style={styles.map}\n        onPress={handlecord}\n        initialRegion={{\n          latitude: location ?.latitude??10.0558,\n          longitude: location ?.longitude??76.6183,\n          latitudeDelta: 0.0922,\n          longitudeDelta: 0.0421,\n        }}\n      >\n        {location && (\n  <Marker\n    coordinate={location}\n    title=\"Current Location\"\n    description=\"This is your current location\"\n  />\n        )}\n{mcoords && (\n  <Marker\n    coordinate={mcoords}\n    title=\"Selected Location\"\n    description=\"This is your selected location\"\n    />\n)}\n{scoords && (\n  <Marker\n    coordinate={scoords}\n    title=\"Searched Location\"\n    description=\"This is your searched location\"\n    />\n)}\n      </MapView>\n\n      </View>\n  );\n};",
+      "code": "const HomeScreen =",
       "start_line": 7,
       "start_col": 0,
       "end_line": 110,
@@ -618,8 +590,8 @@
     }
   ],
   "metadata": {
-    "last_analysis": "2025-04-18T12:03:38.193167",
-    "total_elements": 22,
+    "last_analysis": "2025-04-18T15:02:29.604934",
+    "total_elements": 21,
     "processed_files": [
       "test.py",
       "App.js",

@@ -1,15 +1,15 @@
 {
   "elements": [
     {
-      "type": "function",
-      "name": "hello",
-      "code": "def hello():\n print(\"hello\")",
-      "start_line": 1,
+      "type": "component",
+      "name": "App",
+      "code": "export default function App() {\n  return (\n    <View >\n      <HomeScreen/>\n    </View>\n  );\n}",
+      "start_line": 5,
       "start_col": 0,
-      "end_line": 2,
-      "end_col": 15,
-      "file_path": "test.py",
-      "id": "0c60a5db025bad5b95414ea677bc4671",
+      "end_line": 11,
+      "end_col": 1,
+      "file_path": "App.js",
+      "id": "156c0a4ccab705a3c67714641a4eb85f",
       "dependencies": {
         "tree": {
           "functions": {},
@@ -29,15 +29,15 @@
       }
     },
     {
-      "type": "component",
-      "name": "App",
-      "code": "export default function App() {\n  return (\n    <View >\n      <HomeScreen/>\n    </View>\n  );\n}",
-      "start_line": 5,
+      "type": "function",
+      "name": "hello",
+      "code": "def hello():\n print(\"hello\")",
+      "start_line": 1,
       "start_col": 0,
-      "end_line": 11,
-      "end_col": 1,
-      "file_path": "App.js",
-      "id": "156c0a4ccab705a3c67714641a4eb85f",
+      "end_line": 2,
+      "end_col": 15,
+      "file_path": "test.py",
+      "id": "0c60a5db025bad5b95414ea677bc4671",
       "dependencies": {
         "tree": {
           "functions": {},
@@ -590,11 +590,11 @@
     }
   ],
   "metadata": {
-    "last_analysis": "2025-04-18T15:02:29.604934",
+    "last_analysis": "2025-05-06T14:47:28.036840",
     "total_elements": 21,
     "processed_files": [
-      "test.py",
       "App.js",
+      "test.py",
       "Home.js"
     ]
   }

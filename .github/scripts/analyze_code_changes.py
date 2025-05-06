@@ -169,7 +169,6 @@ class CodeAnalyzer:
             "*.md",
             ".docai/*",
             "babel.config.js",
-
             # Add more standard exclusions here
         ]
 
@@ -330,16 +329,22 @@ class CodeAnalyzer:
                     if node.type == "function_declaration":
                         name_node = node.child_by_field_name("name")
                         if name_node:
-                # Check for JSX to classify as component
+                            # Check for JSX to classify as component
                             body = node.child_by_field_name("body")
                             has_jsx = False
                             if body:
                                 for child in self._iter_tree(body):
-                                    if child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]:
+                                    if child.type in [
+                                        "jsx_element",
+                                        "jsx_self_closing_element",
+                                        "jsx_fragment",
+                                    ]:
                                         has_jsx = True
                                         break
-                            logger.info(f"Found {'component' if has_jsx else 'function'}: {name_node.text.decode('utf-8')}")
-                # Skip if already processed via export_statement
+                            logger.info(
+                                f"Found {'component' if has_jsx else 'function'}: {name_node.text.decode('utf-8')}"
+                            )
+                            # Skip if already processed via export_statement
                             parent = node.parent
                             if parent and parent.type == "export_statement":
                                 return None  # Avoid duplicate processing
@@ -351,15 +356,22 @@ class CodeAnalyzer:
                     elif node.type == "class_declaration":
                         name_node = node.child_by_field_name("name")
                         if name_node:
-                            logger.info(f"Found class: {name_node.text.decode('utf-8')}")
-                            return {"type": "class", "name": name_node.text.decode("utf-8")}
+                            logger.info(
+                                f"Found class: {name_node.text.decode('utf-8')}"
+                            )
+                            return {
+                                "type": "class",
+                                "name": name_node.text.decode("utf-8"),
+                            }
 
                     elif node.type == "method_definition":
                         name_node = node.child_by_field_name("name")
                         if name_node:
                             class_node = self._find_parent_class(node)
                             if class_node:
-                                class_name = class_node.child_by_field_name("name").text.decode("utf-8")
+                                class_name = class_node.child_by_field_name(
+                                    "name"
+                                ).text.decode("utf-8")
                                 method_name = name_node.text.decode("utf-8")
                                 logger.info(f"Found method: {class_name}.{method_name}")
                                 return {
@@ -374,30 +386,51 @@ class CodeAnalyzer:
                                 value_node = declarator.child_by_field_name("value")
                                 if name_node and value_node:
                                     name = name_node.text.decode("utf-8")
-                                    if value_node.type in ["arrow_function", "function_expression"]:
+                                    if value_node.type in [
+                                        "arrow_function",
+                                        "function_expression",
+                                    ]:
                                         body = value_node.child_by_field_name("body")
                                         has_jsx = False
                                         if body:
                                             for child in self._iter_tree(body):
-                                                if child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]:
+                                                if child.type in [
+                                                    "jsx_element",
+                                                    "jsx_self_closing_element",
+                                                    "jsx_fragment",
+                                                ]:
                                                     has_jsx = True
                                                     break
-                                        logger.info(f"Found {'component' if has_jsx else 'function'}: {name}")
+                                        logger.info(
+                                            f"Found {'component' if has_jsx else 'function'}: {name}"
+                                        )
                                         # Limit code to declaration for components
-                                        code_end = value_node.start_byte if has_jsx else node.end_byte
+                                        code_end = (
+                                            value_node.start_byte
+                                            if has_jsx
+                                            else node.end_byte
+                                        )
                                         return {
-                                            "type": "component" if has_jsx else "function",
+                                            "type": (
+                                                "component" if has_jsx else "function"
+                                            ),
                                             "name": name,
                                             "code_end": code_end,  # Custom field to limit code extraction
                                         }
-                                    elif value_node.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]:
-                                        logger.info(f"Found component (direct JSX): {name}")
+                                    elif value_node.type in [
+                                        "jsx_element",
+                                        "jsx_self_closing_element",
+                                        "jsx_fragment",
+                                    ]:
+                                        logger.info(
+                                            f"Found component (direct JSX): {name}"
+                                        )
                                         return {
                                             "type": "component",
                                             "name": name,
                                         }
                                     elif self._is_module_level(node):
-                            # Only module-level variables
+                                        # Only module-level variables
                                         logger.info(f"Found variable: {name}")
                                         return {
                                             "type": "variable_definition",
@@ -414,10 +447,16 @@ class CodeAnalyzer:
                                     has_jsx = False
                                     if body:
                                         for child in self._iter_tree(body):
-                                            if child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]:
+                                            if child.type in [
+                                                "jsx_element",
+                                                "jsx_self_closing_element",
+                                                "jsx_fragment",
+                                            ]:
                                                 has_jsx = True
                                                 break
-                                    logger.info(f"Found exported {'component' if has_jsx else 'function'}: {name_node.text.decode('utf-8')}")
+                                    logger.info(
+                                        f"Found exported {'component' if has_jsx else 'function'}: {name_node.text.decode('utf-8')}"
+                                    )
                                     return {
                                         "type": "component" if has_jsx else "function",
                                         "name": name_node.text.decode("utf-8"),
@@ -425,29 +464,58 @@ class CodeAnalyzer:
                             elif declaration.type == "lexical_declaration":
                                 for declarator in declaration.named_children:
                                     if declarator.type == "variable_declarator":
-                                        name_node = declarator.child_by_field_name("name")
-                                        value_node = declarator.child_by_field_name("value")
+                                        name_node = declarator.child_by_field_name(
+                                            "name"
+                                        )
+                                        value_node = declarator.child_by_field_name(
+                                            "value"
+                                        )
                                         if name_node and value_node:
                                             name = name_node.text.decode("utf-8")
-                                            if value_node.type in ["arrow_function", "function_expression"]:
-                                                body = value_node.child_by_field_name("body")
+                                            if value_node.type in [
+                                                "arrow_function",
+                                                "function_expression",
+                                            ]:
+                                                body = value_node.child_by_field_name(
+                                                    "body"
+                                                )
                                                 has_jsx = False
                                                 if body:
                                                     for child in self._iter_tree(body):
-                                                        if child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]:
+                                                        if child.type in [
+                                                            "jsx_element",
+                                                            "jsx_self_closing_element",
+                                                            "jsx_fragment",
+                                                        ]:
                                                             has_jsx = True
                                                             break
-                                                logger.info(f"Found exported {'component' if has_jsx else 'function'}: {name}")
+                                                logger.info(
+                                                    f"Found exported {'component' if has_jsx else 'function'}: {name}"
+                                                )
                                                 # Limit code to declaration
-                                                code_end = value_node.start_byte if has_jsx else node.end_byte
+                                                code_end = (
+                                                    value_node.start_byte
+                                                    if has_jsx
+                                                    else node.end_byte
+                                                )
                                                 return {
-                                                    "type": "component" if has_jsx else "function",
+                                                    "type": (
+                                                        "component"
+                                                        if has_jsx
+                                                        else "function"
+                                                    ),
                                                     "name": name,
                                                     "code_end": code_end,
                                                 }
 
-                    elif node.type == "import_declaration" and self._is_module_level(node):
-                        import_text = content[node.start_byte : node.end_byte].decode("utf-8", errors="replace").strip()
+                    elif node.type == "import_declaration" and self._is_module_level(
+                        node
+                    ):
+                        import_text = (
+                            content[node.start_byte : node.end_byte]
+                            .decode("utf-8", errors="replace")
+                            .strip()
+                        )
                         import_hash = hashlib.md5(import_text.encode()).hexdigest()[:8]
                         logger.info(f"Found import: import_{import_hash}")
                         return {
@@ -460,11 +528,18 @@ class CodeAnalyzer:
                         node.type == "call_expression"
                         and node.child_by_field_name("function")
                         and node.child_by_field_name("function").type == "identifier"
-                        and node.child_by_field_name("function").text.decode("utf-8") == "require"
+                        and node.child_by_field_name("function").text.decode("utf-8")
+                        == "require"
                         and self._is_module_level(node)
                     ):
-                        require_text = content[node.start_byte : node.end_byte].decode("utf-8", errors="replace").strip()
-                        require_hash = hashlib.md5(require_text.encode()).hexdigest()[:8]
+                        require_text = (
+                            content[node.start_byte : node.end_byte]
+                            .decode("utf-8", errors="replace")
+                            .strip()
+                        )
+                        require_hash = hashlib.md5(require_text.encode()).hexdigest()[
+                            :8
+                        ]
                         logger.info(f"Found require: require_{require_hash}")
                         return {
                             "type": "import_statement",
@@ -589,7 +664,6 @@ class CodeAnalyzer:
         lang_name: str,
         current_element_id: str = None,
     ) -> Dict:
-        """Find dependencies for a code element and include source context."""
         dependencies = {
             "tree": {
                 "functions": {},
@@ -600,10 +674,7 @@ class CodeAnalyzer:
                 "references": [],
             }
         }
-
-        # If current_element_id wasn't provided, try to find it
         if not current_element_id:
-            # Search for this node in elements_by_name to get its ID
             for name, element in elements_by_name.items():
                 if element.get("node") == node or (
                     element.get("start_line") == node.start_point[0] + 1
@@ -614,7 +685,6 @@ class CodeAnalyzer:
                     current_element_id = element.get("id")
                     break
 
-        # Get information about the current element
         current_element_type = None
         current_element_line = 0
         current_element_name = None
@@ -625,7 +695,6 @@ class CodeAnalyzer:
                 current_element_name = element.get("name")
                 break
 
-        # Define language-specific queries
         if lang_name == "python":
             query_str = """
             ; Function calls
@@ -654,12 +723,11 @@ class CodeAnalyzer:
         elif lang_name in ["javascript", "typescript", "tsx", "jsx"]:
             query_str = """
             (call_expression
-              function: [
-                (identifier) @function.call
-                (member_expression
-                  object: (identifier) @class.ref
-                  property: (property_identifier) @method.call)
-              ])
+              function: (identifier) @function.call)
+            (call_expression
+              function: (member_expression
+                object: (identifier) @class.ref
+                property: (property_identifier) @method.call))
             (jsx_element
               open_tag: (jsx_opening_element
                 name: (identifier) @component.use))
@@ -668,40 +736,77 @@ class CodeAnalyzer:
             (call_expression
               function: (identifier) @hook.call
               (#match? @hook.call "^use[A-Z]"))
-            (call_expression
-              function: (identifier) @require
-              arguments: [(string) @import.name]
-              (#eq? @require "require"))
+            (import_declaration
+              (import_clause
+                (named_imports
+                  (import_specifier
+                    name: (identifier) @import.name))))
             (class_declaration
-              superClass: (identifier) @class.inherit)
+              (superclass (identifier) @class.inherit))
             (identifier) @variable.ref
             """
         else:
-            return dependencies
+            query_str = """
+        (call function: (identifier) @function.call)
+        (import_statement name: (dotted_name) @import.name)
+        (import_from_statement module_name: (dotted_name) @import.from)
+        (class_definition superclasses: (argument_list (identifier) @class.inherit))
+        (identifier) @variable.ref
+        """
 
         try:
             query = self.languages[lang_name].query(query_str)
             captures = query.captures(node)
             for capture_node, capture_name in captures:
+                name = capture_node.text.decode("utf-8", errors="replace")
+                logger.info(f"Captured {name} as {capture_name}")
                 if capture_name == "component.use":
                     self._extract_component_usage(
-                        capture_node, content, elements_by_name, dependencies, current_element_id
+                        capture_node,
+                        content,
+                        elements_by_name,
+                        dependencies,
+                        current_element_id,
                     )
                 elif capture_name == "hook.call":
                     self._extract_hook_usage(
-                        capture_node, content, elements_by_name, dependencies, current_element_id
+                        capture_node,
+                        content,
+                        elements_by_name,
+                        dependencies,
+                        current_element_id,
                     )
                 elif capture_name == "function.call":
                     self._extract_function_calls(
-                        capture_node, content, elements_by_name, dependencies, current_element_id
+                        capture_node,
+                        content,
+                        elements_by_name,
+                        dependencies,
+                        current_element_id,
+                    )
+                elif capture_name == "import.name":
+                    self._extract_import_usage(
+                        capture_node,
+                        content,
+                        elements_by_name,
+                        dependencies,
+                        current_element_id,
                     )
                 elif capture_name == "variable.ref":
                     self._extract_variable_references(
-                        capture_node, content, elements_by_name, dependencies, current_element_id
+                        capture_node,
+                        content,
+                        elements_by_name,
+                        dependencies,
+                        current_element_id,
                     )
                 elif capture_name == "class.inherit":
                     self._extract_class_references(
-                        capture_node, content, elements_by_name, dependencies, current_element_id
+                        capture_node,
+                        content,
+                        elements_by_name,
+                        dependencies,
+                        current_element_id,
                     )
 
             self._extract_function_calls(
@@ -761,7 +866,9 @@ class CodeAnalyzer:
                                 pass
                         elif import_text.startswith("import "):
                             try:
-                                imports_part = import_text.replace("import ", "").strip()
+                                imports_part = import_text.replace(
+                                    "import ", ""
+                                ).strip()
                                 if "," in imports_part:
                                     for item in imports_part.split(","):
                                         item = item.strip()
@@ -863,17 +970,12 @@ class CodeAnalyzer:
                                 imported_names.append(variable_part)
                             except Exception:
                                 pass
-                        elif (
-                            "import " in import_text and " from " not in import_text
-                        ):
+                        elif "import " in import_text and " from " not in import_text:
                             imported_names.append("*")
 
                         is_used = False
                         for imported_name in imported_names:
-                            if (
-                                imported_name == "*"
-                                or imported_name in element_code
-                            ):
+                            if imported_name == "*" or imported_name in element_code:
                                 is_used = True
                                 break
 
@@ -948,9 +1050,15 @@ class CodeAnalyzer:
                                                             self.current_file,
                                                             self.repo_path,
                                                         ),
-                                                        "start_line": child.start_point[0] + 1,
-                                                        "start_col": child.start_point[1],
-                                                        "end_line": child.end_point[0] + 1,
+                                                        "start_line": child.start_point[
+                                                            0
+                                                        ]
+                                                        + 1,
+                                                        "start_col": child.start_point[
+                                                            1
+                                                        ],
+                                                        "end_line": child.end_point[0]
+                                                        + 1,
                                                         "end_col": child.end_point[1],
                                                     },
                                                 }
@@ -960,6 +1068,19 @@ class CodeAnalyzer:
             logger.error(f"Error extracting dependencies: {e}")
 
         return dependencies
+
+    def _is_within_function(self, node) -> bool:
+        current = node
+        while current and current.type != "program":
+            if current.type in [
+                "function_declaration",
+                "arrow_function",
+                "function_expression",
+                "method_definition",
+            ]:
+                return True
+            current = current.parent
+        return False
 
     def _get_element_code(self, element_id, elements_by_name):
         """Get the code for an element by ID."""
@@ -1006,7 +1127,7 @@ class CodeAnalyzer:
             logger.error(f"Error extracting imports: {e}")
 
     def _extract_function_calls(
-    self, node, content, elements_by_name, dependencies, current_element_id=None
+        self, node, content, elements_by_name, dependencies, current_element_id=None
     ):
         try:
             if node.type in ["call_expression", "call"]:
@@ -1016,9 +1137,9 @@ class CodeAnalyzer:
                     if func_node.type == "identifier":
                         func_name = func_node.text.decode("utf-8", errors="replace")
                     elif func_node.type in ["attribute", "member_expression"]:
-                        func_name = content[func_node.start_byte : func_node.end_byte].decode(
-                            "utf-8", errors="replace"
-                        )
+                        func_name = content[
+                            func_node.start_byte : func_node.end_byte
+                        ].decode("utf-8", errors="replace")
 
                 if func_name and func_name in elements_by_name:
                     element = elements_by_name[func_name]
@@ -1036,7 +1157,9 @@ class CodeAnalyzer:
                             "source_code": call_code,
                             "code": element.get("code", ""),
                             "source_location": {
-                                "file": os.path.relpath(self.current_file, self.repo_path),
+                                "file": os.path.relpath(
+                                    self.current_file, self.repo_path
+                                ),
                                 "start_line": node.start_point[0] + 1,
                                 "start_col": node.start_point[1],
                                 "end_line": node.end_point[0] + 1,
@@ -1213,7 +1336,7 @@ class CodeAnalyzer:
     # --- Added: New method to extract JSX component usage ---
 
     def _extract_component_usage(
-    self, node, content, elements_by_name, dependencies, current_element_id=None
+        self, node, content, elements_by_name, dependencies, current_element_id=None
     ):
         try:
             if node.type in ["jsx_element", "jsx_self_closing_element"]:
@@ -1233,40 +1356,48 @@ class CodeAnalyzer:
                     if component_name in elements_by_name:
                         element = elements_by_name[component_name]
                         if element.get("id") != current_element_id:
-                            dependencies["tree"]["references"].append({
+                            dependencies["tree"]["references"].append(
+                                {
+                                    "name": component_name,
+                                    "type": "component_reference",
+                                    "id": element.get("id", ""),
+                                    "file": element.get("file_path", ""),
+                                    "line": element.get("start_line", 0),
+                                    "context": "component_usage",
+                                    "code": element.get("code", ""),
+                                    "source_location": {
+                                        "file": os.path.relpath(
+                                            self.current_file, self.repo_path
+                                        ),
+                                        "start_line": node.start_point[0] + 1,
+                                        "start_col": node.start_point[1],
+                                        "end_line": node.end_point[0] + 1,
+                                        "end_col": node.end_point[1],
+                                    },
+                                }
+                            )
+                    else:
+                        # External component (e.g., Marker)
+                        dependencies["tree"]["references"].append(
+                            {
                                 "name": component_name,
                                 "type": "component_reference",
-                                "id": element.get("id", ""),
-                                "file": element.get("file_path", ""),
-                                "line": element.get("start_line", 0),
+                                "id": "",
+                                "file": "unknown",
+                                "line": 0,
                                 "context": "component_usage",
-                                "code": element.get("code", ""),
+                                "code": component_code,
                                 "source_location": {
-                                    "file": os.path.relpath(self.current_file, self.repo_path),
+                                    "file": os.path.relpath(
+                                        self.current_file, self.repo_path
+                                    ),
                                     "start_line": node.start_point[0] + 1,
                                     "start_col": node.start_point[1],
                                     "end_line": node.end_point[0] + 1,
                                     "end_col": node.end_point[1],
                                 },
-                            })
-                    else:
-                        # External component (e.g., Marker)
-                        dependencies["tree"]["references"].append({
-                            "name": component_name,
-                            "type": "component_reference",
-                            "id": "",
-                            "file": "unknown",
-                            "line": 0,
-                            "context": "component_usage",
-                            "code": component_code,
-                            "source_location": {
-                                "file": os.path.relpath(self.current_file, self.repo_path),
-                                "start_line": node.start_point[0] + 1,
-                                "start_col": node.start_point[1],
-                                "end_line": node.end_point[0] + 1,
-                                "end_col": node.end_point[1],
-                            },
-                        })
+                            }
+                        )
 
             for child in node.children:
                 self._extract_component_usage(
@@ -1276,7 +1407,7 @@ class CodeAnalyzer:
             logger.error(f"Error extracting component usage: {e}")
 
     def _extract_import_usage(
-    self, node, content, elements_by_name, dependencies, current_element_id=None
+        self, node, content, elements_by_name, dependencies, current_element_id=None
     ):
         try:
             if node.type == "import_declaration":
@@ -1288,91 +1419,146 @@ class CodeAnalyzer:
                             if child.type == "named_imports":
                                 for specifier in child.named_children:
                                     if specifier.type == "import_specifier":
-                                        name_node = specifier.child_by_field_name("name")
+                                        name_node = specifier.child_by_field_name(
+                                            "name"
+                                        )
                                         if name_node:
                                             name = name_node.text.decode("utf-8")
-                                            import_code = content[node.start_byte : node.end_byte].decode(
-                                                "utf-8", errors="replace"
-                                            )
+                                            import_code = content[
+                                                node.start_byte : node.end_byte
+                                            ].decode("utf-8", errors="replace")
                                             if name in elements_by_name:
                                                 element = elements_by_name[name]
-                                                if element.get("id") != current_element_id:
-                                                    dependencies["tree"]["references"].append({
-                                                        "name": name,
-                                                        "type": "import_reference",
-                                                        "id": element.get("id", ""),
-                                                        "file": element.get("file_path", ""),
-                                                        "line": element.get("start_line", 0),
-                                                        "context": "import_usage",
-                                                        "code": element.get("code", ""),
-                                                        "source_location": {
-                                                            "file": os.path.relpath(self.current_file, self.repo_path),
-                                                            "start_line": node.start_point[0] + 1,
-                                                            "start_col": node.start_point[1],
-                                                            "end_line": node.end_point[0] + 1,
-                                                            "end_col": node.end_point[1],
-                                                        },
-                                                    })
+                                                if (
+                                                    element.get("id")
+                                                    != current_element_id
+                                                ):
+                                                    dependencies["tree"][
+                                                        "references"
+                                                    ].append(
+                                                        {
+                                                            "name": name,
+                                                            "type": "import_reference",
+                                                            "id": element.get("id", ""),
+                                                            "file": element.get(
+                                                                "file_path", ""
+                                                            ),
+                                                            "line": element.get(
+                                                                "start_line", 0
+                                                            ),
+                                                            "context": "import_usage",
+                                                            "code": element.get(
+                                                                "code", ""
+                                                            ),
+                                                            "source_location": {
+                                                                "file": os.path.relpath(
+                                                                    self.current_file,
+                                                                    self.repo_path,
+                                                                ),
+                                                                "start_line": node.start_point[
+                                                                    0
+                                                                ]
+                                                                + 1,
+                                                                "start_col": node.start_point[
+                                                                    1
+                                                                ],
+                                                                "end_line": node.end_point[
+                                                                    0
+                                                                ]
+                                                                + 1,
+                                                                "end_col": node.end_point[
+                                                                    1
+                                                                ],
+                                                            },
+                                                        }
+                                                    )
                                             else:
                                                 # External import
-                                                dependencies["tree"]["references"].append({
-                                                    "name": name,
-                                                    "type": "import_reference",
-                                                    "id": "",
-                                                    "file": "unknown",
-                                                    "line": 0,
-                                                    "context": "import_usage",
-                                                    "code": import_code,
-                                                    "source_location": {
-                                                        "file": os.path.relpath(self.current_file, self.repo_path),
-                                                        "start_line": node.start_point[0] + 1,
-                                                        "start_col": node.start_point[1],
-                                                        "end_line": node.end_point[0] + 1,
-                                                        "end_col": node.end_point[1],
-                                                    },
-                                                })
+                                                dependencies["tree"][
+                                                    "references"
+                                                ].append(
+                                                    {
+                                                        "name": name,
+                                                        "type": "import_reference",
+                                                        "id": "",
+                                                        "file": "unknown",
+                                                        "line": 0,
+                                                        "context": "import_usage",
+                                                        "code": import_code,
+                                                        "source_location": {
+                                                            "file": os.path.relpath(
+                                                                self.current_file,
+                                                                self.repo_path,
+                                                            ),
+                                                            "start_line": node.start_point[
+                                                                0
+                                                            ]
+                                                            + 1,
+                                                            "start_col": node.start_point[
+                                                                1
+                                                            ],
+                                                            "end_line": node.end_point[
+                                                                0
+                                                            ]
+                                                            + 1,
+                                                            "end_col": node.end_point[
+                                                                1
+                                                            ],
+                                                        },
+                                                    }
+                                                )
                             elif child.type == "identifier":
                                 name = child.text.decode("utf-8")
-                                import_code = content[node.start_byte : node.end_byte].decode(
-                                    "utf-8", errors="replace"
-                                )
+                                import_code = content[
+                                    node.start_byte : node.end_byte
+                                ].decode("utf-8", errors="replace")
                                 if name in elements_by_name:
                                     element = elements_by_name[name]
                                     if element.get("id") != current_element_id:
-                                        dependencies["tree"]["references"].append({
+                                        dependencies["tree"]["references"].append(
+                                            {
+                                                "name": name,
+                                                "type": "import_reference",
+                                                "id": element.get("id", ""),
+                                                "file": element.get("file_path", ""),
+                                                "line": element.get("start_line", 0),
+                                                "context": "import_usage",
+                                                "code": element.get("code", ""),
+                                                "source_location": {
+                                                    "file": os.path.relpath(
+                                                        self.current_file,
+                                                        self.repo_path,
+                                                    ),
+                                                    "start_line": node.start_point[0]
+                                                    + 1,
+                                                    "start_col": node.start_point[1],
+                                                    "end_line": node.end_point[0] + 1,
+                                                    "end_col": node.end_point[1],
+                                                },
+                                            }
+                                        )
+                                else:
+                                    # External import
+                                    dependencies["tree"]["references"].append(
+                                        {
                                             "name": name,
                                             "type": "import_reference",
-                                            "id": element.get("id", ""),
-                                            "file": element.get("file_path", ""),
-                                            "line": element.get("start_line", 0),
+                                            "id": "",
+                                            "file": "unknown",
+                                            "line": 0,
                                             "context": "import_usage",
-                                            "code": element.get("code", ""),
+                                            "code": import_code,
                                             "source_location": {
-                                                "file": os.path.relpath(self.current_file, self.repo_path),
+                                                "file": os.path.relpath(
+                                                    self.current_file, self.repo_path
+                                                ),
                                                 "start_line": node.start_point[0] + 1,
                                                 "start_col": node.start_point[1],
                                                 "end_line": node.end_point[0] + 1,
                                                 "end_col": node.end_point[1],
                                             },
-                                        })
-                                else:
-                                    # External import
-                                    dependencies["tree"]["references"].append({
-                                        "name": name,
-                                        "type": "import_reference",
-                                        "id": "",
-                                        "file": "unknown",
-                                        "line": 0,
-                                        "context": "import_usage",
-                                        "code": import_code,
-                                        "source_location": {
-                                            "file": os.path.relpath(self.current_file, self.repo_path),
-                                            "start_line": node.start_point[0] + 1,
-                                            "start_col": node.start_point[1],
-                                            "end_line": node.end_point[0] + 1,
-                                            "end_col": node.end_point[1],
-                                        },
-                                    })
+                                        }
+                                    )
 
             for child in node.children:
                 self._extract_import_usage(
@@ -1382,7 +1568,7 @@ class CodeAnalyzer:
             logger.error(f"Error extracting import usage: {e}")
 
     def _extract_hook_usage(
-    self, node, content, elements_by_name, dependencies, current_element_id=None
+        self, node, content, elements_by_name, dependencies, current_element_id=None
     ):
         try:
             if node.type == "call_expression":
@@ -1396,40 +1582,48 @@ class CodeAnalyzer:
                         if func_name in elements_by_name:
                             element = elements_by_name[func_name]
                             if element.get("id") != current_element_id:
-                                dependencies["tree"]["references"].append({
+                                dependencies["tree"]["references"].append(
+                                    {
+                                        "name": func_name,
+                                        "type": "hook_reference",
+                                        "id": element.get("id", ""),
+                                        "file": element.get("file_path", ""),
+                                        "line": element.get("start_line", 0),
+                                        "context": "hook_usage",
+                                        "code": element.get("code", ""),
+                                        "source_location": {
+                                            "file": os.path.relpath(
+                                                self.current_file, self.repo_path
+                                            ),
+                                            "start_line": node.start_point[0] + 1,
+                                            "start_col": node.start_point[1],
+                                            "end_line": node.end_point[0] + 1,
+                                            "end_col": node.end_point[1],
+                                        },
+                                    }
+                                )
+                        else:
+                            # External hook (e.g., useState)
+                            dependencies["tree"]["references"].append(
+                                {
                                     "name": func_name,
                                     "type": "hook_reference",
-                                    "id": element.get("id", ""),
-                                    "file": element.get("file_path", ""),
-                                    "line": element.get("start_line", 0),
+                                    "id": "",
+                                    "file": "unknown",
+                                    "line": 0,
                                     "context": "hook_usage",
-                                    "code": element.get("code", ""),
+                                    "code": hook_code,
                                     "source_location": {
-                                        "file": os.path.relpath(self.current_file, self.repo_path),
+                                        "file": os.path.relpath(
+                                            self.current_file, self.repo_path
+                                        ),
                                         "start_line": node.start_point[0] + 1,
                                         "start_col": node.start_point[1],
                                         "end_line": node.end_point[0] + 1,
                                         "end_col": node.end_point[1],
                                     },
-                                })
-                        else:
-                        # External hook (e.g., useState)
-                            dependencies["tree"]["references"].append({
-                                "name": func_name,
-                                "type": "hook_reference",
-                                "id": "",
-                                "file": "unknown",
-                                "line": 0,
-                                "context": "hook_usage",
-                                "code": hook_code,
-                                "source_location": {
-                                    "file": os.path.relpath(self.current_file, self.repo_path),
-                                    "start_line": node.start_point[0] + 1,
-                                    "start_col": node.start_point[1],
-                                    "end_line": node.end_point[0] + 1,
-                                    "end_col": node.end_point[1],
-                                },
-                            })
+                                }
+                            )
 
             for child in node.children:
                 self._extract_hook_usage(
@@ -1440,7 +1634,9 @@ class CodeAnalyzer:
 
     def _parse_file(self, file_path: str) -> List[Dict]:
         lang_name = self._get_file_language(file_path)
-        logger.info(f"File: {file_path}, exists: {os.path.exists(file_path)}, lang: {lang_name}")
+        logger.info(
+            f"File: {file_path}, exists: {os.path.exists(file_path)}, lang: {lang_name}"
+        )
         if not lang_name or lang_name not in self.languages:
             logger.info(f"Cannot parse {file_path}: Language {lang_name} not supported")
             return []
@@ -1498,7 +1694,9 @@ class CodeAnalyzer:
                         if len(existing["code"]) > len(element["code"]):
                             continue
                         else:
-                            code_elements = [e for e in code_elements if e["id"] != element_id]
+                            code_elements = [
+                                e for e in code_elements if e["id"] != element_id
+                            ]
                             del elements_by_name[existing["name"]]
                             del elements_by_id[element_id]
 
@@ -1508,7 +1706,10 @@ class CodeAnalyzer:
                         elements_by_id[element_id] = element
                         code_elements.append(element)
                     elif element["type"] == "function" and component_scope:
-                        if node.start_point[0] >= component_scope["start_line"] and node.end_point[0] <= component_scope["end_line"]:
+                        if (
+                            node.start_point[0] >= component_scope["start_line"]
+                            and node.end_point[0] <= component_scope["end_line"]
+                        ):
                             elements_by_name[element_info["name"]] = element
                             elements_by_id[element_id] = element
                         else:
@@ -1521,7 +1722,9 @@ class CodeAnalyzer:
                         code_elements.append(element)
 
                 except Exception as e:
-                    logger.error(f"Error processing element {element_info['name']} in {file_path}: {e}")
+                    logger.error(
+                        f"Error processing element {element_info['name']} in {file_path}: {e}"
+                    )
                     continue
 
         all_dependencies = {}
@@ -1563,7 +1766,9 @@ class CodeAnalyzer:
                             other_element = elements_by_id.get(other_id)
                             if other_element and other_element["id"] != element["id"]:
                                 direct_reference_tracking[element["id"]].add(other_id)
-                                element["referenced_by"][category][other_element["name"]] = {
+                                element["referenced_by"][category][
+                                    other_element["name"]
+                                ] = {
                                     "id": other_id,
                                     "name": other_element["name"],
                                     "type": other_element["type"],
@@ -1584,49 +1789,53 @@ class CodeAnalyzer:
                         other_element = elements_by_id.get(other_id)
                         if other_element and other_element["id"] != element["id"]:
                             direct_reference_tracking[element["id"]].add(other_id)
-                            element["referenced_by"]["inheritance"].append({
-                                "id": other_id,
-                                "name": other_element["name"],
-                                "type": other_element["type"],
-                                "file": other_element["file_path"],
-                                "line": other_element["start_line"],
-                                "context": "inherited_by",
-                                "code": other_element["code"],
-                                "source_location": {
+                            element["referenced_by"]["inheritance"].append(
+                                {
+                                    "id": other_id,
+                                    "name": other_element["name"],
+                                    "type": other_element["type"],
                                     "file": other_element["file_path"],
-                                    "start_line": other_element["start_line"],
-                                    "start_col": other_element["start_col"],
-                                    "end_line": other_element["end_line"],
-                                    "end_col": other_element["end_col"],
-                                },
-                            })
+                                    "line": other_element["start_line"],
+                                    "context": "inherited_by",
+                                    "code": other_element["code"],
+                                    "source_location": {
+                                        "file": other_element["file_path"],
+                                        "start_line": other_element["start_line"],
+                                        "start_col": other_element["start_col"],
+                                        "end_line": other_element["end_line"],
+                                        "end_col": other_element["end_col"],
+                                    },
+                                }
+                            )
                 for ref_info in deps["tree"]["references"]:
                     if ref_info.get("id") == element["id"]:
                         other_element = elements_by_id.get(other_id)
                         if other_element and other_element["id"] != element["id"]:
                             direct_reference_tracking[element["id"]].add(other_id)
-                            element["referenced_by"]["references"].append({
-                                "id": other_id,
-                                "name": other_element["name"],
-                                "type": other_element["type"],
-                                "file": other_element["file_path"],
-                                "line": other_element["start_line"],
-                                "context": "referenced_by",
-                                "code": other_element["code"],
-                                "source_location": {
+                            element["referenced_by"]["references"].append(
+                                {
+                                    "id": other_id,
+                                    "name": other_element["name"],
+                                    "type": other_element["type"],
                                     "file": other_element["file_path"],
-                                    "start_line": other_element["start_line"],
-                                    "start_col": other_element["start_col"],
-                                    "end_line": other_element["end_line"],
-                                    "end_col": other_element["end_col"],
-                                },
-                            })
+                                    "line": other_element["start_line"],
+                                    "context": "referenced_by",
+                                    "code": other_element["code"],
+                                    "source_location": {
+                                        "file": other_element["file_path"],
+                                        "start_line": other_element["start_line"],
+                                        "start_col": other_element["start_col"],
+                                        "end_line": other_element["end_line"],
+                                        "end_col": other_element["end_col"],
+                                    },
+                                }
+                            )
 
         for element in code_elements:
             dependencies = element["dependencies"]["tree"]
             self._remove_redundant_references(dependencies)
             self._remove_bidirectional_redundancies(element, direct_reference_tracking)
-            
+
         for element in code_elements:
             if "node" in element:
                 del element["node"]
@@ -1810,10 +2019,12 @@ class CodeAnalyzer:
 
     def analyze_repository(self) -> Dict[str, Any]:
         logger.info(f"Starting repository analysis at {self.repo_path}")
+
         all_code_elements = []
         processed_files = []
         global_elements_by_name = {}
 
+        # First pass: collect all elements
         for root, dirs, files in os.walk(self.repo_path):
             dirs[:] = [
                 d for d in dirs if not self._should_exclude_path(os.path.join(root, d))
@@ -1837,9 +2048,13 @@ class CodeAnalyzer:
         # Second pass: update dependencies with global elements
         for element in all_code_elements:
             try:
-                with open(os.path.join(self.repo_path, element["file_path"]), "rb") as f:
+                with open(
+                    os.path.join(self.repo_path, element["file_path"]), "rb"
+                ) as f:
                     content = f.read()
-                lang_name = self._get_file_language(os.path.join(self.repo_path, element["file_path"]))
+                lang_name = self._get_file_language(
+                    os.path.join(self.repo_path, element["file_path"])
+                )
                 self.parser.language = self.languages[lang_name]
                 tree = self.parser.parse(content)
                 node = None
@@ -1856,11 +2071,27 @@ class CodeAnalyzer:
                     element["dependencies"] = self._find_dependencies(
                         node, content, global_elements_by_name, lang_name, element["id"]
                     )
+                else:
+                    logger.warning(
+                        f"Node not found for element {element['name']} in {element['file_path']}"
+                    )
             except Exception as e:
                 logger.error(f"Error updating dependencies for {element['name']}: {e}")
+                element["dependencies"] = {
+                    "tree": {
+                        "functions": {},
+                        "classes": {},
+                        "variables": {},
+                        "calls": [],
+                        "inheritance": [],
+                        "references": [],
+                    }
+                }
 
-    # Third pass: add back-references
-        direct_reference_tracking = {element["id"]: set() for element in all_code_elements}
+        # Third pass: add back-references
+        direct_reference_tracking = {
+            element["id"]: set() for element in all_code_elements
+        }
         for element in all_code_elements:
             element["referenced_by"] = {
                 "functions": {},
@@ -1876,8 +2107,12 @@ class CodeAnalyzer:
                 for category in ["functions", "classes", "variables"]:
                     for item_name, item_info in deps["tree"][category].items():
                         if item_info.get("id") == element["id"]:
-                            direct_reference_tracking[element["id"]].add(other_element["id"])
-                            element["referenced_by"][category][other_element["name"]] = {
+                            direct_reference_tracking[element["id"]].add(
+                                other_element["id"]
+                            )
+                            element["referenced_by"][category][
+                                other_element["name"]
+                            ] = {
                                 "id": other_element["id"],
                                 "name": other_element["name"],
                                 "type": other_element["type"],
@@ -1893,44 +2128,31 @@ class CodeAnalyzer:
                                     "end_col": other_element["end_col"],
                                 },
                             }
-                for inherit_info in deps["tree"]["inheritance"]:
-                    if inherit_info.get("id") == element["id"]:
-                        direct_reference_tracking[element["id"]].add(other_element["id"])
-                        element["referenced_by"]["inheritance"].append({
-                            "id": other_element["id"],
-                            "name": other_element["name"],
-                            "type": other_element["type"],
-                            "file": other_element["file_path"],
-                            "line": other_element["start_line"],
-                            "context": "inherited_by",
-                            "code": other_element["code"],
-                            "source_location": {
-                                "file": other_element["file_path"],
-                                "start_line": other_element["start_line"],
-                                "start_col": other_element["start_col"],
-                                "end_line": other_element["end_line"],
-                                "end_col": other_element["end_col"],
-                            },
-                        })
                 for ref_info in deps["tree"]["references"]:
                     if ref_info.get("id") == element["id"]:
-                        direct_reference_tracking[element["id"]].add(other_element["id"])
-                        element["referenced_by"]["references"].append({
-                            "id": other_element["id"],
-                            "name": other_element["name"],
-                            "type": other_element["type"],
-                            "file": other_element["file_path"],
-                            "line": other_element["start_line"],
-                            "context": "referenced_by",
-                            "code": other_element["code"],
-                            "source_location": {
-                                "file": other_element["file_path"],
-                                "start_line": other_element["start_line"],
-                                "start_col": other_element["start_col"],
-                                "end_line": other_element["end_line"],
-                                "end_col": other_element["end_col"],
-                            },
-                        })
+                        other_element = elements_by_id.get(other_id)
+                        if other_element and other_element["id"] != element["id"]:
+                            direct_reference_tracking[element["id"]].add(
+                                other_element["id"]
+                            )
+                            element["referenced_by"]["references"].append(
+                                {
+                                    "id": other_element["id"],
+                                    "name": other_element["name"],
+                                    "type": other_element["type"],
+                                    "file": other_element["file_path"],
+                                    "line": other_element["start_line"],
+                                    "context": "referenced_by",
+                                    "code": other_element["code"],
+                                    "source_location": {
+                                        "file": other_element["file_path"],
+                                        "start_line": other_element["start_line"],
+                                        "start_col": other_element["start_col"],
+                                        "end_line": other_element["end_line"],
+                                        "end_col": other_element["end_col"],
+                                    },
+                                }
+                            )
 
         for element in all_code_elements:
             dependencies = element["dependencies"]["tree"]

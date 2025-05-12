@@ -125,6 +125,7 @@ class CodeAnalyzer:
         logger.info(f"Loaded {len(self.languages)} language parsers")
 
     def _setup_tree_sitter(self) -> Dict[str, Language]:
+        """Initialize and load tree-sitter languages."""
         import pkg_resources
         lang_objects = {}
         language_map = {
@@ -136,13 +137,13 @@ class CodeAnalyzer:
         for lang_name, module_name in language_map.items():
             try:
                 module = importlib.import_module(module_name)
-                # Use language binary directly
+                # Pass both binary and name to Language
                 if lang_name == "tsx":
-                    lang_objects[lang_name] = Language(module.language_tsx())
+                    lang_objects[lang_name] = Language(module.language_tsx(), "tsx")
                 elif lang_name == "typescript":
-                    lang_objects[lang_name] = Language(module.language_typescript())
+                    lang_objects[lang_name] = Language(module.language_typescript(), "typescript")
                 else:
-                    lang_objects[lang_name] = Language(module.language())
+                    lang_objects[lang_name] = Language(module.language(), lang_name)
                 logger.info(f"Loaded {lang_name} parser")
             except Exception as e:
                 logger.warning(f"Failed to load {lang_name} parser: {e}")

@@ -81,25 +81,25 @@ try:
         logger.warning("Some optional language modules could not be imported")
 
     # Map language names to their tree-sitter language modules
-    LANGUAGE_MODULES = {
-        "python": tree_sitter_python.language,
-        "javascript": tree_sitter_javascript.language,
-        "typescript": tree_sitter_typescript.language_typescript,
-        "tsx": tree_sitter_typescript.language_tsx,
-    }
+    # LANGUAGE_MODULES = {
+    #     "python": tree_sitter_python.language,
+    #     "javascript": tree_sitter_javascript.language,
+    #     "typescript": tree_sitter_typescript.language_typescript,
+    #     "tsx": tree_sitter_typescript.language_tsx,
+    # }
 
-    # Add optional languages if available
-    try:
-        LANGUAGE_MODULES["java"] = tree_sitter_java.language
-        LANGUAGE_MODULES["go"] = tree_sitter_go.language
-        LANGUAGE_MODULES["rust"] = tree_sitter_rust.language
-        LANGUAGE_MODULES["ruby"] = tree_sitter_ruby.language
-        LANGUAGE_MODULES["php"] = tree_sitter_php.language
-        LANGUAGE_MODULES["c_sharp"] = tree_sitter_c_sharp.language
-        LANGUAGE_MODULES["cpp"] = tree_sitter_cpp.language
-        LANGUAGE_MODULES["c"] = tree_sitter_cpp.language  # Use C++ parser for C
-    except NameError:
-        pass  # Skip if language module wasn't imported
+    # # Add optional languages if available
+    # try:
+    #     LANGUAGE_MODULES["java"] = tree_sitter_java.language
+    #     LANGUAGE_MODULES["go"] = tree_sitter_go.language
+    #     LANGUAGE_MODULES["rust"] = tree_sitter_rust.language
+    #     LANGUAGE_MODULES["ruby"] = tree_sitter_ruby.language
+    #     LANGUAGE_MODULES["php"] = tree_sitter_php.language
+    #     LANGUAGE_MODULES["c_sharp"] = tree_sitter_c_sharp.language
+    #     LANGUAGE_MODULES["cpp"] = tree_sitter_cpp.language
+    #     LANGUAGE_MODULES["c"] = tree_sitter_cpp.language  # Use C++ parser for C
+    # except NameError:
+    #     pass  # Skip if language module wasn't imported
 
 except ImportError:
     logger.error("Core tree-sitter language modules could not be imported")

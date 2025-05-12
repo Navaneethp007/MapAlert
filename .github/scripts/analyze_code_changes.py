@@ -19,6 +19,7 @@ import logging
 import itertools
 from typing import Dict, List, Optional, Set, Any
 from pathlib import Path
+import importlib
 
 try:
     from tree_sitter import Language, Parser

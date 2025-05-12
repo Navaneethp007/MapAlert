@@ -125,15 +125,32 @@ class CodeAnalyzer:
 
     def _setup_tree_sitter(self) -> Dict[str, Language]:
         """Initialize and load tree-sitter languages."""
+        import pkg_resources
         lang_objects = {}
-        for lang_name, lang_module in LANGUAGE_MODULES.items():
+        language_map = {
+            "python": "tree_sitter_python",
+            "javascript": "tree_sitter_javascript",
+            "typescript": "tree_sitter_typescript",
+            "tsx": "tree_sitter_tsx",
+            "java": "tree_sitter_java",
+            "go": "tree_sitter_go",
+            "rust": "tree_sitter_rust",
+            "ruby": "tree_sitter_ruby",
+            "php": "tree_sitter_php",
+            "c_sharp": "tree_sitter_c_sharp",
+            "cpp": "tree_sitter_cpp",
+            "c": "tree_sitter_cpp",
+        }
+
+        for lang_name, module_name in language_map.items():
             try:
-                if lang_module:
-                    lang = Language(lang_module())
-                    lang_objects[lang_name] = lang
-                    logger.debug(f"Loaded language: {lang_name}")
+                module = importlib.import_module(module_name)
+                language_path = pkg_resources.resource_filename(module_name, f"vendor/tree-sitter-{lang_name}/src")
+                lang_objects[lang_name] = Language(language_path, lang_name)
+                logger.info(f"Loaded {lang_name} parser")
             except Exception as e:
-                logger.error(f"Error loading language {lang_name}: {e}")
+                logger.warning(f"Failed to load {lang_name} parser: {e}")
+
         return lang_objects
 
     def _load_excluded_paths(self) -> List[str]:
@@ -257,7 +274,6 @@ class CodeAnalyzer:
         return hashlib.md5(unique_str.encode()).hexdigest()
 
     def _get_element_info(self, node, content: bytes, lang_name: str) -> Optional[Dict]:
-        """Extract information about a code element from its node."""
         try:
             # Python-specific handling
             if lang_name == "python":
@@ -268,81 +284,12 @@ class CodeAnalyzer:
                             "type": "function",
                             "name": name_node.text.decode("utf-8"),
                         }
-
+    
                 elif node.type == "class_definition":
                     name_node = node.child_by_field_name("name")
                     if name_node:
                         return {"type": "class", "name": name_node.text.decode("utf-8")}
-
-                elif node.type == "method_definition":
-                    name_node = node.child_by_field_name("name")
-                    if name_node:
-                        # Get class name if this is a method
-                        class_node = self._find_parent_class(node)
-                        if class_node:
-                            class_name = class_node.child_by_field_name(
-                                "name"
-                            ).text.decode("utf-8")
-                            method_name = name_node.text.decode("utf-8")
-                            return {
-                                "type": "method",
-                                "name": f"{class_name}.{method_name}",
-                            }
-                        else:
-                            return {
-                                "type": "function",
-                                "name": name_node.text.decode("utf-8"),
-                            }
-
-                # Handle variable assignments at module level
-                elif node.type == "assignment" and self._is_module_level(node):
-                    # Extract variable name from the target
-                    target = node.child_by_field_name("left")
-                    if target and target.type in ["identifier", "attribute"]:
-                        var_name = target.text.decode("utf-8")
-                        return {
-                            "type": "variable_definition",
-                            "name": var_name,
-                        }
-
-                # Handle import statements at module level
-                elif node.type in [
-                    "import_statement",
-                    "import_from_statement",
-                ] and self._is_module_level(node):
-                    # Generate a unique name for the import
-                    import_text = (
-                        content[node.start_byte : node.end_byte]
-                        .decode("utf-8", errors="replace")
-                        .strip()
-                    )
-                    import_hash = hashlib.md5(import_text.encode()).hexdigest()[:8]
-                    return {
-                        "type": "import_statement",
-                        "name": f"import_{import_hash}",
-                        "import_text": import_text,
-                    }
-
-            # JavaScript/TypeScript handling
-            elif lang_name in ["javascript", "typescript", "tsx", "jsx"]:
-                if node.type == "function_declaration":
-                    name_node = node.child_by_field_name("name")
-                    if name_node:
-                        body = node.child_by_field_name("body")
-                        has_jsx = any(
-                            child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]
-                            for child in self._iter_tree(body or node)
-                        )
-                        return {
-                            "type": "component" if has_jsx else "function",
-                            "name": name_node.text.decode("utf-8"),
-                        }
-
-                elif node.type == "class_declaration":
-                    name_node = node.child_by_field_name("name")
-                    if name_node:
-                        return {"type": "class", "name": name_node.text.decode("utf-8")}
-
+    
                 elif node.type == "method_definition":
                     name_node = node.child_by_field_name("name")
                     if name_node:
@@ -354,7 +301,63 @@ class CodeAnalyzer:
                                 "type": "method",
                                 "name": f"{class_name}.{method_name}",
                             }
-
+                        else:
+                            return {
+                                "type": "function",
+                                "name": name_node.text.decode("utf-8"),
+                            }
+    
+                elif node.type == "assignment" and self._is_module_level(node):
+                    target = node.child_by_field_name("left")
+                    if target and target.type in ["identifier", "attribute"]:
+                        var_name = target.text.decode("utf-8")
+                        return {
+                            "type": "variable_definition",
+                            "name": var_name,
+                        }
+    
+                elif node.type in ["import_statement", "import_from_statement"] and self._is_module_level(node):
+                    import_text = content[node.start_byte : node.end_byte].decode("utf-8", errors="replace").strip()
+                    import_hash = hashlib.md5(import_text.encode()).hexdigest()[:8]
+                    return {
+                        "type": "import_statement",
+                        "name": f"import_{import_hash}",
+                        "import_text": import_text,
+                    }
+    
+            # JavaScript/TypeScript handling
+            elif lang_name in ["javascript", "typescript", "tsx", "jsx"]:
+                if node.type == "function_declaration":
+                    name_node = node.child_by_field_name("name")
+                    if name_node:
+                        body = node.child_by_field_name("body")
+                        has_jsx = any(
+                            child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]
+                            for child in self._iter_tree(body or node)
+                        )
+                        logger.debug(f"Detected function {name_node.text.decode('utf-8')}, has_jsx: {has_jsx}")
+                        return {
+                            "type": "component" if has_jsx else "function",
+                            "name": name_node.text.decode("utf-8"),
+                        }
+    
+                elif node.type == "class_declaration":
+                    name_node = node.child_by_field_name("name")
+                    if name_node:
+                        return {"type": "class", "name": name_node.text.decode("utf-8")}
+    
+                elif node.type == "method_definition":
+                    name_node = node.child_by_field_name("name")
+                    if name_node:
+                        class_node = self._find_parent_class(node)
+                        if class_node:
+                            class_name = class_node.child_by_field_name("name").text.decode("utf-8")
+                            method_name = name_node.text.decode("utf-8")
+                            return {
+                                "type": "method",
+                                "name": f"{class_name}.{method_name}",
+                            }
+    
                 elif node.type == "lexical_declaration":
                     for declarator in node.named_children:
                         if declarator.type == "variable_declarator":
@@ -368,6 +371,7 @@ class CodeAnalyzer:
                                         child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]
                                         for child in self._iter_tree(body or value_node)
                                     )
+                                    logger.debug(f"Detected function {name}, has_jsx: {has_jsx}")
                                     return {
                                         "type": "component" if has_jsx else "function",
                                         "name": name,
@@ -383,7 +387,7 @@ class CodeAnalyzer:
                                         "type": "variable_definition",
                                         "name": name,
                                     }
-
+    
                 elif node.type == "export_statement":
                     declaration = node.child_by_field_name("declaration")
                     if declaration:
@@ -395,6 +399,7 @@ class CodeAnalyzer:
                                     child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]
                                     for child in self._iter_tree(body or declaration)
                                 )
+                                logger.debug(f"Detected export function {name_node.text.decode('utf-8')}, has_jsx: {has_jsx}")
                                 return {
                                     "type": "component" if has_jsx else "function",
                                     "name": name_node.text.decode("utf-8"),
@@ -412,12 +417,13 @@ class CodeAnalyzer:
                                                 child.type in ["jsx_element", "jsx_self_closing_element", "jsx_fragment"]
                                                 for child in self._iter_tree(body or value_node)
                                             )
+                                            logger.debug(f"Detected export function {name}, has_jsx: {has_jsx}")
                                             return {
                                                 "type": "component" if has_jsx else "function",
                                                 "name": name,
                                                 "code_end": value_node.end_byte,
                                             }
-
+    
                 elif node.type == "import_declaration" and self._is_module_level(node):
                     import_text = content[node.start_byte : node.end_byte].decode("utf-8", errors="replace").strip()
                     import_hash = hashlib.md5(import_text.encode()).hexdigest()[:8]
@@ -426,7 +432,7 @@ class CodeAnalyzer:
                         "name": f"import_{import_hash}",
                         "import_text": import_text,
                     }
-
+    
                 elif (
                     node.type == "call_expression"
                     and node.child_by_field_name("function")
@@ -441,18 +447,15 @@ class CodeAnalyzer:
                         "name": f"require_{require_hash}",
                         "import_text": require_text,
                     }
-           
+    
             # Java-specific handling
             elif lang_name == "java":
                 if node.type == "method_declaration":
                     name_node = node.child_by_field_name("name")
                     if name_node:
-                        # Get class name if this is a method
                         class_node = self._find_parent_class(node)
                         if class_node:
-                            class_name = class_node.child_by_field_name(
-                                "name"
-                            ).text.decode("utf-8")
+                            class_name = class_node.child_by_field_name("name").text.decode("utf-8")
                             method_name = name_node.text.decode("utf-8")
                             return {
                                 "type": "method",
@@ -463,44 +466,33 @@ class CodeAnalyzer:
                                 "type": "function",
                                 "name": name_node.text.decode("utf-8"),
                             }
-
+    
                 elif node.type == "class_declaration":
                     name_node = node.child_by_field_name("name")
                     if name_node:
                         return {"type": "class", "name": name_node.text.decode("utf-8")}
-
-                # Handle import statements at module level
+    
                 elif node.type == "import_declaration" and self._is_module_level(node):
-                    # Generate a unique name for the import
-                    import_text = (
-                        content[node.start_byte : node.end_byte]
-                        .decode("utf-8", errors="replace")
-                        .strip()
-                    )
+                    import_text = content[node.start_byte : node.end_byte].decode("utf-8", errors="replace").strip()
                     import_hash = hashlib.md5(import_text.encode()).hexdigest()[:8]
                     return {
                         "type": "import_statement",
                         "name": f"import_{import_hash}",
                         "import_text": import_text,
                     }
-
-                # Handle variable declarations at module/class level
+    
                 elif node.type == "field_declaration" and self._is_module_level(node):
                     declarator = node.child_by_field_name("declarator")
                     if declarator and declarator.child_by_field_name("name"):
-                        var_name = declarator.child_by_field_name("name").text.decode(
-                            "utf-8"
-                        )
+                        var_name = declarator.child_by_field_name("name").text.decode("utf-8")
                         return {
                             "type": "variable_definition",
                             "name": var_name,
                         }
-
-            # You can add more language-specific handlers here
-
+    
         except Exception as e:
             logger.error(f"Error getting element info: {e}")
-
+    
         return None
 
     def _find_parent_class(self, node) -> Optional[object]:
@@ -560,51 +552,40 @@ class CodeAnalyzer:
     current_element_id: str = None,
     ) -> Dict:
         dependencies = {
-           "tree": {
-               "functions": {},
-               "classes": {},
-               "variables": {},
-               "calls": [],
-               "inheritance": [],
-               "references": [],
-           }
+            "tree": {
+                "functions": {},
+                "classes": {},
+                "variables": {},
+                "calls": [],
+                "inheritance": [],
+                "references": [],
+            }
         }
-
+    
         if not current_element_id:
-           for name, element in elements_by_name.items():
-               if element.get("node") == node or (
-                   element.get("start_line") == node.start_point[0] + 1
-                   and element.get("start_col") == node.start_point[1]
-                   and element.get("end_line") == node.end_point[0] + 1
-                   and element.get("end_col") == node.end_point[1]
-               ):
-                   current_element_id = element.get("id")
-                   current_element_type = element.get("type")
-                   break
-
+            for name, element in elements_by_name.items():
+                if element.get("node") == node or (
+                    element.get("start_line") == node.start_point[0] + 1
+                    and element.get("start_col") == node.start_point[1]
+                    and element.get("end_line") == node.end_point[0] + 1
+                    and element.get("end_col") == node.end_point[1]
+                ):
+                    current_element_id = element.get("id")
+                    current_element_type = element.get("type")
+                    break
+    
         if lang_name == "python":
             query_str = """
-            ; Function calls
-            (call
-              function: [
-                (identifier) @function.call
-                (attribute 
-                  object: (_) @class.ref
-                  attribute: (identifier) @method.call)
-              ])
-            
-            ; Imports
+            (call_expression
+              function: (identifier) @function.call)
             (import_statement
               name: (dotted_name) @import.name)
             (import_from_statement
-              module_name: (dotted_name) @import.from)
-            
-            ; Class inheritance
+              name: (dotted_name) @import.from)
             (class_definition
-              superclasses: (argument_list
-                (identifier) @class.inherit))
-            
-            ; Variable references
+              (superclasses
+                (argument_list
+                  (identifier) @class.inherit)))
             (identifier) @variable.ref
             """
         elif lang_name in ["javascript", "typescript", "tsx", "jsx"]:
@@ -613,7 +594,7 @@ class CodeAnalyzer:
               function: (identifier) @function.call)
             (call_expression
               function: (member_expression
-                object: (identifier) @class.ref
+                object: (identifier)
                 property: (property_identifier) @method.call))
             (jsx_element
               open_tag: (jsx_opening_element
@@ -625,42 +606,52 @@ class CodeAnalyzer:
               (#match? @hook.call "^use[A-Z]"))
             (import_declaration
               (import_clause
-                (named_imports
-                  (import_specifier
-                    name: (identifier) @import.name))))
+                [(identifier) @import.name
+                 (named_imports
+                   (import_specifier
+                     name: (identifier) @import.name))]))
             (class_declaration
               (superclass (identifier) @class.inherit))
             (identifier) @variable.ref
             """
         else:
             query_str = """
-        (call function: (identifier) @function.call)
-        (import_statement name: (dotted_name) @import.name)
-        (import_from_statement module_name: (dotted_name) @import.from)
-        (class_definition superclasses: (argument_list (identifier) @class.inherit))
-        (identifier) @variable.ref
-        """
-
+            (call_expression
+              function: (identifier) @function.call)
+            (import_statement
+              name: (dotted_name) @import.name)
+            (import_from_statement
+              name: (dotted_name) @import.from)
+            (class_definition
+              (superclasses
+                (argument_list
+                  (identifier) @class.inherit)))
+            (identifier) @variable.ref
+            """
+    
         try:
             logger.debug(f"Applying query for {lang_name} on node {node.type}")
             query = self.languages[lang_name].query(query_str)
             captures = query.captures(node)
             for capture_node, capture_name in captures:
-                name = capture_node.text.decode("utf-8", errors="replace")
-                logger.debug(f"Captured {name} as {capture_name} at line {capture_node.start_point[0] + 1}")
-                if capture_name == "component.use":
-                    self._extract_component_usage(capture_node, content, elements_by_name, dependencies, current_element_id)
-                elif capture_name == "hook.call":
-                    self._extract_hook_usage(capture_node, content, elements_by_name, dependencies, current_element_id)
-                elif capture_name == "function.call":
-                    self._extract_function_calls(capture_node, content, elements_by_name, dependencies, current_element_id)
-                elif capture_name == "import.name":
-                    self._extract_import_usage(capture_node, content, elements_by_name, dependencies, current_element_id)
-                elif capture_name == "variable.ref":
-                    self._extract_variable_references(capture_node, content, elements_by_name, dependencies, current_element_id)
-                elif capture_name == "class.inherit":
-                    self._extract_class_references(capture_node, content, elements_by_name, dependencies, current_element_id)
-
+                try:
+                    name = capture_node.text.decode("utf-8", errors="replace")
+                    logger.debug(f"Captured {name} as {capture_name} at line {capture_node.start_point[0] + 1}")
+                    if capture_name == "component.use":
+                        self._extract_component_usage(capture_node, content, elements_by_name, dependencies, current_element_id)
+                    elif capture_name == "hook.call":
+                        self._extract_hook_usage(capture_node, content, elements_by_name, dependencies, current_element_id)
+                    elif capture_name == "function.call":
+                        self._extract_function_calls(capture_node, content, elements_by_name, dependencies, current_element_id)
+                    elif capture_name == "import.name":
+                        self._extract_import_usage(capture_node, content, elements_by_name, dependencies, current_element_id)
+                    elif capture_name == "variable.ref":
+                        self._extract_variable_references(capture_node, content, elements_by_name, dependencies, current_element_id)
+                    elif capture_name == "class.inherit":
+                        self._extract_class_references(capture_node, content, elements_by_name, dependencies, current_element_id)
+                except Exception as e:
+                    logger.error(f"Error processing capture {capture_name}: {e}")
+    
             logger.debug(f"Manual traversal for {node.type}")
             self._extract_function_calls(node, content, elements_by_name, dependencies, current_element_id)
             self._extract_variable_references(node, content, elements_by_name, dependencies, current_element_id)
@@ -668,51 +659,59 @@ class CodeAnalyzer:
             self._extract_component_usage(node, content, elements_by_name, dependencies, current_element_id)
             self._extract_import_usage(node, content, elements_by_name, dependencies, current_element_id)
             self._extract_hook_usage(node, content, elements_by_name, dependencies, current_element_id)
-
-            if lang_name == "python" and current_element_type != "import_statement":
+    
+            if current_element_type != "import_statement":
                 element_code = ""
                 for name, element in elements_by_name.items():
                     if element.get("id") == current_element_id:
                         element_code = element.get("code", "")
                         break
-
+    
                 for name, element in elements_by_name.items():
                     if element.get("type") == "import_statement":
                         if element["id"] == current_element_id:
                             continue
                         import_text = element.get("code", "")
                         imported_names = []
-
-                        if import_text.startswith("from "):
-                            try:
-                                parts = import_text.split(" import ")
-                                if len(parts) == 2:
-                                    module_name = parts[0].replace("from ", "").strip()
-                                    imports_part = parts[1].strip()
+    
+                        if lang_name == "python":
+                            if import_text.startswith("from "):
+                                try:
+                                    parts = import_text.split(" import ")
+                                    if len(parts) == 2:
+                                        module_name = parts[0].replace("from ", "").strip()
+                                        imports_part = parts[1].strip()
+                                        if "," in imports_part:
+                                            for item in imports_part.split(","):
+                                                item = item.strip()
+                                                if " as " in item:
+                                                    item = item.split(" as ")[1].strip()
+                                                imported_names.append(item)
+                                        else:
+                                            item = imports_part
+                                            if " as " in item:
+                                                item = item.split(" as ")[1].strip()
+                                            imported_names.append(item)
+                                        if "." in module_name:
+                                            base_module = module_name.split(".")[0]
+                                            imported_names.append(base_module)
+                                except Exception:
+                                    pass
+                            elif import_text.startswith("import "):
+                                try:
+                                    imports_part = import_text.replace("import ", "").strip()
                                     if "," in imports_part:
                                         for item in imports_part.split(","):
                                             item = item.strip()
                                             if " as " in item:
                                                 item = item.split(" as ")[1].strip()
-                                            imported_names.append(item)
+                                            if "." in item:
+                                                base_module = item.split(".")[0]
+                                                imported_names.append(base_module)
+                                            else:
+                                                imported_names.append(item)
                                     else:
                                         item = imports_part
-                                        if " as " in item:
-                                            item = item.split(" as ")[1].strip()
-                                        imported_names.append(item)
-                                    if "." in module_name:
-                                        base_module = module_name.split(".")[0]
-                                        imported_names.append(base_module)
-                            except Exception:
-                                pass
-                        elif import_text.startswith("import "):
-                            try:
-                                imports_part = import_text.replace(
-                                    "import ", ""
-                                ).strip()
-                                if "," in imports_part:
-                                    for item in imports_part.split(","):
-                                        item = item.strip()
                                         if " as " in item:
                                             item = item.split(" as ")[1].strip()
                                         if "." in item:
@@ -720,111 +719,48 @@ class CodeAnalyzer:
                                             imported_names.append(base_module)
                                         else:
                                             imported_names.append(item)
-                                else:
-                                    item = imports_part
-                                    if " as " in item:
-                                        item = item.split(" as ")[1].strip()
-                                    if "." in item:
-                                        base_module = item.split(".")[0]
-                                        imported_names.append(base_module)
-                                    else:
-                                        imported_names.append(item)
-                            except Exception:
-                                pass
-
-                        is_used = False
-                        for imported_name in imported_names:
-                            if imported_name in element_code:
-                                is_used = True
-                                break
-
-                        if is_used:
-                            if not any(
-                                ref.get("id") == element["id"]
-                                for ref in dependencies["tree"]["references"]
-                            ):
-                                dependencies["tree"]["references"].append(
-                                    {
-                                        "name": name,
-                                        "type": "import_reference",
-                                        "id": element.get("id", ""),
-                                        "file": element.get("file_path", ""),
-                                        "line": element.get("start_line", 0),
-                                        "context": "import_dependency",
-                                        "code": element.get("code", ""),
-                                        "source_location": {
-                                            "file": element.get("file_path", ""),
-                                            "start_line": element.get("start_line", 0),
-                                            "start_col": element.get("start_col", 0),
-                                            "end_line": element.get("end_line", 0),
-                                            "end_col": element.get("end_col", 0),
-                                        },
-                                    }
-                                )
-
-            elif (
-                lang_name in ["javascript", "typescript", "tsx", "jsx"]
-                and current_element_type != "import_statement"
-            ):
-                element_code = ""
-                for name, element in elements_by_name.items():
-                    if element.get("id") == current_element_id:
-                        element_code = element.get("code", "")
-                        break
-
-                for name, element in elements_by_name.items():
-                    if element.get("type") == "import_statement":
-                        if element["id"] == current_element_id:
-                            continue
-                        import_text = element.get("code", "")
-                        imported_names = []
-
-                        if "import {" in import_text:
-                            try:
-                                import_part = import_text.split("{")[1].split("}")[0]
-                                for part in import_part.split(","):
-                                    name_part = part.strip()
-                                    if " as " in name_part:
-                                        name_part = name_part.split(" as ")[1]
-                                    imported_names.append(name_part)
-                            except Exception:
-                                pass
-                        elif "import " in import_text and " from " in import_text:
-                            try:
-                                default_import = (
-                                    import_text.split("import ")[1]
-                                    .split(" from ")[0]
-                                    .strip()
-                                )
-                                imported_names.append(default_import)
-                            except Exception:
-                                pass
-                        elif "require(" in import_text:
-                            try:
-                                variable_part = import_text.split("=")[0].strip()
-                                if "const " in variable_part:
-                                    variable_part = variable_part.replace("const ", "")
-                                elif "let " in variable_part:
-                                    variable_part = variable_part.replace("let ", "")
-                                elif "var " in variable_part:
-                                    variable_part = variable_part.replace("var ", "")
-                                imported_names.append(variable_part)
-                            except Exception:
-                                pass
-                        elif "import " in import_text and " from " not in import_text:
-                            imported_names.append("*")
-
+                                except Exception:
+                                    pass
+                        elif lang_name in ["javascript", "typescript", "tsx", "jsx"]:
+                            if "import {" in import_text:
+                                try:
+                                    import_part = import_text.split("{")[1].split("}")[0]
+                                    for part in import_part.split(","):
+                                        name_part = part.strip()
+                                        if " as " in name_part:
+                                            name_part = name_part.split(" as ")[1]
+                                        imported_names.append(name_part)
+                                except Exception:
+                                    pass
+                            elif "import " in import_text and " from " in import_text:
+                                try:
+                                    default_import = import_text.split("import ")[1].split(" from ")[0].strip()
+                                    imported_names.append(default_import)
+                                except Exception:
+                                    pass
+                            elif "require(" in import_text:
+                                try:
+                                    variable_part = import_text.split("=")[0].strip()
+                                    if "const " in variable_part:
+                                        variable_part = variable_part.replace("const ", "")
+                                    elif "let " in variable_part:
+                                        variable_part = variable_part.replace("let ", "")
+                                    elif "var " in variable_part:
+                                        variable_part = variable_part.replace("var ", "")
+                                    imported_names.append(variable_part)
+                                except Exception:
+                                    pass
+                            elif "import " in import_text and " from " not in import_text:
+                                imported_names.append("*")
+    
                         is_used = False
                         for imported_name in imported_names:
                             if imported_name == "*" or imported_name in element_code:
                                 is_used = True
                                 break
-
+    
                         if is_used:
-                            if not any(
-                                ref.get("id") == element["id"]
-                                for ref in dependencies["tree"]["references"]
-                            ):
+                            if not any(ref.get("id") == element["id"] for ref in dependencies["tree"]["references"]):
                                 dependencies["tree"]["references"].append(
                                     {
                                         "name": name,
@@ -843,71 +779,45 @@ class CodeAnalyzer:
                                         },
                                     }
                                 )
-
+    
             if lang_name == "python" and current_element_type == "class":
                 if node.type == "class_definition":
                     superclass_node = node.child_by_field_name("superclasses")
                     if superclass_node:
                         for child in superclass_node.children:
                             if child.type == "identifier":
-                                superclass_name = child.text.decode(
-                                    "utf-8", errors="replace"
-                                )
+                                superclass_name = child.text.decode("utf-8", errors="replace")
                                 if superclass_name in elements_by_name:
-                                    superclass_element = elements_by_name[
-                                        superclass_name
-                                    ]
-                                    if (
-                                        superclass_element.get("id")
-                                        != current_element_id
-                                    ):
+                                    superclass_element = elements_by_name[superclass_name]
+                                    if superclass_element.get("id") != current_element_id:
                                         if not any(
-                                            inherit.get("id")
-                                            == superclass_element.get("id")
-                                            for inherit in dependencies["tree"][
-                                                "inheritance"
-                                            ]
+                                            inherit.get("id") == superclass_element.get("id")
+                                            for inherit in dependencies["tree"]["inheritance"]
                                         ):
                                             dependencies["tree"]["inheritance"].append(
                                                 {
-                                                    "id": superclass_element.get(
-                                                        "id", ""
-                                                    ),
+                                                    "id": superclass_element.get("id", ""),
                                                     "name": superclass_name,
                                                     "type": "class",
-                                                    "file": superclass_element.get(
-                                                        "file_path", ""
-                                                    ),
-                                                    "line": superclass_element.get(
-                                                        "start_line", 0
-                                                    ),
+                                                    "file": superclass_element.get("file_path", ""),
+                                                    "line": superclass_element.get("start_line", 0),
                                                     "context": "inheritance",
                                                     "source_code": superclass_name,
-                                                    "code": superclass_element.get(
-                                                        "code", ""
-                                                    ),
+                                                    "code": superclass_element.get("code", ""),
                                                     "source_location": {
-                                                        "file": os.path.relpath(
-                                                            self.current_file,
-                                                            self.repo_path,
-                                                        ),
-                                                        "start_line": child.start_point[
-                                                            0
-                                                        ]
-                                                        + 1,
-                                                        "start_col": child.start_point[
-                                                            1
-                                                        ],
-                                                        "end_line": child.end_point[0]
-                                                        + 1,
+                                                        "file": os.path.relpath(self.current_file, self.repo_path),
+                                                        "start_line": child.start_point[0] + 1,
+                                                        "start_col": child.start_point[1],
+                                                        "end_line": child.end_point[0] + 1,
                                                         "end_col": child.end_point[1],
                                                     },
                                                 }
                                             )
-
+    
         except Exception as e:
             logger.error(f"Error extracting dependencies: {e}")
-
+    
+        logger.debug(f"Dependencies for {current_element_id}: {dependencies['tree']}")
         return dependencies
 
     def _is_within_function(self, node) -> bool:
@@ -969,8 +879,8 @@ class CodeAnalyzer:
             logger.error(f"Error extracting imports: {e}")
 
     def _extract_function_calls(
-        self, node, content, elements_by_name, dependencies, current_element_id=None
-    ):
+    self, node, content, elements_by_name, dependencies, current_element_id=None
+):
         try:
             if node.type in ["call_expression", "call"]:
                 func_node = node.child_by_field_name("function")
@@ -979,16 +889,13 @@ class CodeAnalyzer:
                     if func_node.type == "identifier":
                         func_name = func_node.text.decode("utf-8", errors="replace")
                     elif func_node.type in ["attribute", "member_expression"]:
-                        func_name = content[
-                            func_node.start_byte : func_node.end_byte
-                        ].decode("utf-8", errors="replace")
-
+                        func_name = content[func_node.start_byte : func_node.end_byte].decode("utf-8", errors="replace")
+    
                 if func_name and func_name in elements_by_name:
                     element = elements_by_name[func_name]
                     if element.get("id") != current_element_id:
-                        call_code = content[node.start_byte : node.end_byte].decode(
-                            "utf-8", errors="replace"
-                        )
+                        call_code = content[node.start_byte : node.end_byte].decode("utf-8", errors="replace")
+                        logger.debug(f"Captured function call {func_name} at line {node.start_point[0] + 1}")
                         dependencies["tree"]["functions"][func_name] = {
                             "id": element.get("id", ""),
                             "name": func_name,
@@ -999,16 +906,14 @@ class CodeAnalyzer:
                             "source_code": call_code,
                             "code": element.get("code", ""),
                             "source_location": {
-                                "file": os.path.relpath(
-                                    self.current_file, self.repo_path
-                                ),
+                                "file": os.path.relpath(self.current_file, self.repo_path),
                                 "start_line": node.start_point[0] + 1,
                                 "start_col": node.start_point[1],
                                 "end_line": node.end_point[0] + 1,
                                 "end_col": node.end_point[1],
                             },
                         }
-
+    
             for child in node.children:
                 self._extract_function_calls(
                     child, content, elements_by_name, dependencies, current_element_id
@@ -1480,29 +1385,29 @@ class CodeAnalyzer:
         if not lang_name or lang_name not in self.languages:
             logger.info(f"Cannot parse {file_path}: Language {lang_name} not supported")
             return []
-
+    
         try:
             with open(file_path, "rb") as f:
                 content = f.read()
         except Exception as e:
             logger.error(f"Error reading file {file_path}: {e}")
             return []
-
+    
         self.parser.language = self.languages[lang_name]
         try:
             tree = self.parser.parse(content)
         except Exception as e:
             logger.error(f"Error parsing {file_path}: {e}")
             return []
-
+    
         logger.info(f"Parsing file: {file_path}")
         self.current_file = file_path
-
+    
         code_elements = []
         elements_by_name = {}
         elements_by_id = {}
         component_scope = None
-
+    
         for node in self._iter_tree(tree.root_node):
             element_info = self._get_element_info(node, content, lang_name)
             if element_info and element_info.get("name"):
@@ -1510,7 +1415,7 @@ class CodeAnalyzer:
                     code_end = element_info.get("code_end", node.end_byte)
                     element_code = content[node.start_byte : code_end].decode("utf-8", errors="replace")
                     rel_file_path = os.path.relpath(file_path, self.repo_path)
-
+    
                     element = {
                         "type": element_info["type"],
                         "name": element_info["name"],
@@ -1522,11 +1427,11 @@ class CodeAnalyzer:
                         "file_path": rel_file_path,
                         "node": node,
                     }
-
+    
                     element["code"] = self._format_code(element["code"])
                     element_id = self._generate_element_id(element)
                     element["id"] = element_id
-
+    
                     if element_id in elements_by_id:
                         existing = elements_by_id[element_id]
                         if len(existing["code"]) > len(element["code"]):
@@ -1535,27 +1440,33 @@ class CodeAnalyzer:
                             code_elements = [e for e in code_elements if e["id"] != element_id]
                             del elements_by_name[existing["name"]]
                             del elements_by_id[element_id]
-
+    
+                    logger.debug(f"Processing element {element['name']} (type: {element['type']})")
                     if element["type"] == "component":
                         component_scope = element
                         elements_by_name[element_info["name"]] = element
                         elements_by_id[element_id] = element
                         code_elements.append(element)
-                    elif element["type"] == "function" and component_scope:
+                    elif element["type"] == "function":
                         elements_by_name[element_info["name"]] = element
                         elements_by_id[element_id] = element
-                        if node.start_point[0] >= component_scope["start_line"] - 1 and node.end_point[0] <= component_scope["end_line"]:
-                             continue  # Store as dependency, not top-level
+                        if component_scope and (
+                            node.start_point[0] >= component_scope["start_line"] - 1 and 
+                            node.end_point[0] <= component_scope["end_line"]
+                        ):
+                            logger.debug(f"Storing {element['name']} as dependency for {component_scope['name']}")
+                            # Store as dependency, not top-level
+                            continue
                         code_elements.append(element)
                     else:
                         elements_by_name[element_info["name"]] = element
                         elements_by_id[element_id] = element
                         code_elements.append(element)
-
+    
                 except Exception as e:
                     logger.error(f"Error processing element {element_info['name']} in {file_path}: {e}")
                     continue
-
+    
         all_dependencies = {}
         for element in code_elements:
             try:
@@ -1576,7 +1487,7 @@ class CodeAnalyzer:
                         "references": [],
                     }
                 }
-
+    
         direct_reference_tracking = {element["id"]: set() for element in code_elements}
         for element in code_elements:
             element["referenced_by"] = {
@@ -1632,17 +1543,17 @@ class CodeAnalyzer:
                                     "end_col": other_element["end_col"],
                                 },
                             })
-
+    
         for element in code_elements:
             dependencies = element["dependencies"]["tree"]
             self._remove_redundant_references(dependencies)
             self._remove_bidirectional_redundancies(element, direct_reference_tracking)
             self._verify_no_bidirectional_references(element)
-
+    
         for element in code_elements:
             if "node" in element:
                 del element["node"]
-
+    
         logger.info(f"Found {len(code_elements)} code elements in {file_path}")
         return code_elements
 

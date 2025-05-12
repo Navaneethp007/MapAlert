@@ -132,15 +132,7 @@ class CodeAnalyzer:
             "python": "tree_sitter_python",
             "javascript": "tree_sitter_javascript",
             "typescript": "tree_sitter_typescript",
-            "tsx": "tree_sitter_tsx",
-            "java": "tree_sitter_java",
-            "go": "tree_sitter_go",
-            "rust": "tree_sitter_rust",
-            "ruby": "tree_sitter_ruby",
-            "php": "tree_sitter_php",
-            "c_sharp": "tree_sitter_c_sharp",
-            "cpp": "tree_sitter_cpp",
-            "c": "tree_sitter_cpp",
+            "tsx": "tree_sitter_typescript",
         }
 
         for lang_name, module_name in language_map.items():

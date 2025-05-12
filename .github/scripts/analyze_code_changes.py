@@ -1382,7 +1382,7 @@ class CodeAnalyzer:
             logger.error(f"Error reading file {file_path}: {e}")
             return []
     
-        self.parser.language = self.languages[lang_name]
+        self.parser.set_language(self.languages[lang_name])
         try:
             tree = self.parser.parse(content)
         except Exception as e:

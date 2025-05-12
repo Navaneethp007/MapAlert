@@ -63,47 +63,47 @@ LANGUAGE_EXTENSIONS = {
 }
 
 # Load language libraries
-try:
-    # Tree-sitter language modules
-    import tree_sitter_python
-    import tree_sitter_javascript
-    import tree_sitter_typescript
+# try:
+#     # Tree-sitter language modules
+#     import tree_sitter_python
+#     import tree_sitter_javascript
+#     import tree_sitter_typescript
 
-    try:
-        import tree_sitter_java
-        import tree_sitter_go
-        import tree_sitter_rust
-        import tree_sitter_ruby
-        import tree_sitter_php
-        import tree_sitter_c_sharp
-        import tree_sitter_cpp
-    except ImportError:
-        logger.warning("Some optional language modules could not be imported")
+#     try:
+#         import tree_sitter_java
+#         import tree_sitter_go
+#         import tree_sitter_rust
+#         import tree_sitter_ruby
+#         import tree_sitter_php
+#         import tree_sitter_c_sharp
+#         import tree_sitter_cpp
+#     except ImportError:
+#         logger.warning("Some optional language modules could not be imported")
 
-    # Map language names to their tree-sitter language modules
-    # LANGUAGE_MODULES = {
-    #     "python": tree_sitter_python.language,
-    #     "javascript": tree_sitter_javascript.language,
-    #     "typescript": tree_sitter_typescript.language_typescript,
-    #     "tsx": tree_sitter_typescript.language_tsx,
-    # }
+#     # Map language names to their tree-sitter language modules
+#     # LANGUAGE_MODULES = {
+#     #     "python": tree_sitter_python.language,
+#     #     "javascript": tree_sitter_javascript.language,
+#     #     "typescript": tree_sitter_typescript.language_typescript,
+#     #     "tsx": tree_sitter_typescript.language_tsx,
+#     # }
 
-    # # Add optional languages if available
-    # try:
-    #     LANGUAGE_MODULES["java"] = tree_sitter_java.language
-    #     LANGUAGE_MODULES["go"] = tree_sitter_go.language
-    #     LANGUAGE_MODULES["rust"] = tree_sitter_rust.language
-    #     LANGUAGE_MODULES["ruby"] = tree_sitter_ruby.language
-    #     LANGUAGE_MODULES["php"] = tree_sitter_php.language
-    #     LANGUAGE_MODULES["c_sharp"] = tree_sitter_c_sharp.language
-    #     LANGUAGE_MODULES["cpp"] = tree_sitter_cpp.language
-    #     LANGUAGE_MODULES["c"] = tree_sitter_cpp.language  # Use C++ parser for C
-    # except NameError:
-    #     pass  # Skip if language module wasn't imported
+#     # # Add optional languages if available
+#     # try:
+#     #     LANGUAGE_MODULES["java"] = tree_sitter_java.language
+#     #     LANGUAGE_MODULES["go"] = tree_sitter_go.language
+#     #     LANGUAGE_MODULES["rust"] = tree_sitter_rust.language
+#     #     LANGUAGE_MODULES["ruby"] = tree_sitter_ruby.language
+#     #     LANGUAGE_MODULES["php"] = tree_sitter_php.language
+#     #     LANGUAGE_MODULES["c_sharp"] = tree_sitter_c_sharp.language
+#     #     LANGUAGE_MODULES["cpp"] = tree_sitter_cpp.language
+#     #     LANGUAGE_MODULES["c"] = tree_sitter_cpp.language  # Use C++ parser for C
+#     # except NameError:
+#     #     pass  # Skip if language module wasn't imported
 
-except ImportError:
-    logger.error("Core tree-sitter language modules could not be imported")
-    sys.exit(1)
+# except ImportError:
+#     logger.error("Core tree-sitter language modules could not be imported")
+#     sys.exit(1)
 
 
 class CodeAnalyzer:
@@ -125,7 +125,6 @@ class CodeAnalyzer:
         logger.info(f"Loaded {len(self.languages)} language parsers")
 
     def _setup_tree_sitter(self) -> Dict[str, Language]:
-        """Initialize and load tree-sitter languages."""
         import pkg_resources
         lang_objects = {}
         language_map = {
@@ -134,16 +133,19 @@ class CodeAnalyzer:
             "typescript": "tree_sitter_typescript",
             "tsx": "tree_sitter_typescript",
         }
-
         for lang_name, module_name in language_map.items():
             try:
                 module = importlib.import_module(module_name)
-                language_path = pkg_resources.resource_filename(module_name, f"vendor/tree-sitter-{lang_name}/src")
-                lang_objects[lang_name] = Language(language_path, lang_name)
+                # Use language binary directly
+                if lang_name == "tsx":
+                    lang_objects[lang_name] = Language(module.language_tsx())
+                elif lang_name == "typescript":
+                    lang_objects[lang_name] = Language(module.language_typescript())
+                else:
+                    lang_objects[lang_name] = Language(module.language())
                 logger.info(f"Loaded {lang_name} parser")
             except Exception as e:
                 logger.warning(f"Failed to load {lang_name} parser: {e}")
-
         return lang_objects
 
     def _load_excluded_paths(self) -> List[str]:

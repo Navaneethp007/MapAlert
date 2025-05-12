@@ -30,9 +30,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install GitPython tree_sitter
-        # Install language parsers for tree-sitter
-        pip install tree-sitter-python tree-sitter-javascript tree-sitter-typescript tree-sitter-java tree-sitter-go tree-sitter-rust
+        pip cache purge
+        pip install GitPython tree-sitter==0.21.0
+        pip install tree-sitter-python==0.21.0 tree-sitter-javascript==0.21.0 tree-sitter-typescript==0.21.0
 
     - name: Analyze code changes
       run: |

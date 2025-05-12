@@ -539,12 +539,7 @@ class CodeAnalyzer:
         }
 
     def _find_dependencies(
-    self,
-    node,
-    content: bytes,
-    elements_by_name: Dict,
-    lang_name: str,
-    current_element_id: str = None,
+    self, node, content: bytes, elements_by_name: Dict, lang_name: str, current_element_id: str = None
     ) -> Dict:
         dependencies = {
             "tree": {
@@ -571,56 +566,54 @@ class CodeAnalyzer:
     
         if lang_name == "python":
             query_str = """
-            (call_expression
-              function: (identifier) @function.call)
+            (call
+            function: (identifier) @function.call)
             (import_statement
-              name: (dotted_name) @import.name)
+            (dotted_name) @import.name)
             (import_from_statement
-              name: (dotted_name) @import.from)
+            (dotted_name) @import.from)
             (class_definition
-              (superclasses
-                (argument_list
-                  (identifier) @class.inherit)))
+            superclasses: (argument_list
+                (identifier) @class.inherit))
             (identifier) @variable.ref
             """
         elif lang_name in ["javascript", "typescript", "tsx", "jsx"]:
             query_str = """
             (call_expression
-              function: (identifier) @function.call)
+            function: (identifier) @function.call)
             (call_expression
-              function: (member_expression
+            function: (member_expression
                 object: (identifier)
                 property: (property_identifier) @method.call))
             (jsx_element
-              open_tag: (jsx_opening_element
+            open_tag: (jsx_opening_element
                 name: (identifier) @component.use))
             (jsx_self_closing_element
-              name: (identifier) @component.use)
+            name: (identifier) @component.use)
             (call_expression
-              function: (identifier) @hook.call
-              (#match? @hook.call "^use[A-Z]"))
-            (import_declaration
-              (import_clause
+            function: (identifier) @hook.call
+            (#match? @hook.call "^use[A-Z]"))
+            (import_statement
+            (import_clause
                 [(identifier) @import.name
-                 (named_imports
-                   (import_specifier
-                     name: (identifier) @import.name))]))
+                (named_imports
+                (import_specifier
+                    name: (identifier) @import.name))]))
             (class_declaration
-              (superclass (identifier) @class.inherit))
+            (superclass (identifier) @class.inherit))
             (identifier) @variable.ref
             """
         else:
             query_str = """
-            (call_expression
-              function: (identifier) @function.call)
+            (call
+            function: (identifier) @function.call)
             (import_statement
-              name: (dotted_name) @import.name)
+            (dotted_name) @import.name)
             (import_from_statement
-              name: (dotted_name) @import.from)
+            (dotted_name) @import.from)
             (class_definition
-              (superclasses
-                (argument_list
-                  (identifier) @class.inherit)))
+            superclasses: (argument_list
+                (identifier) @class.inherit))
             (identifier) @variable.ref
             """
     

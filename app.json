@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Carmel",
-    "slug": "Carmel",
+    "name": "MapAlert",
+    "slug": "mapalert",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -9,27 +9,51 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#4A90E2"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.mapalert",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "MapAlert needs your location to show your position on the map and calculate distance to your destination.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "MapAlert needs background location access to alert you when you're approaching your destination.",
+        "UIBackgroundModes": [
+          "location"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#4A90E2"
+      },
+      "package": "com.yourcompany.mapalert",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCqTQif955FFWM6-dH4Wix5_fCQ8S_nYiI"
+        }
       }
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "extra": {
-      "eas": {
-        "projectId": "0a7ae452-1859-49e9-ab8c-5f4ddff36df8"
-      }
-    }
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow MapAlert to use your location to alert you when approaching your destination.",
+          "locationAlwaysPermission": "Allow MapAlert to use your location in the background to alert you when approaching your destination.",
+          "locationWhenInUsePermission": "Allow MapAlert to use your location to show your position on the map."
+        }
+      ]
+    ]
   }
 }
